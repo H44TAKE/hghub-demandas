@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel de Manutenção · REDE HG</title>
+  <link rel="icon" href="/web/logo.png">
+  <link rel="stylesheet" href="/web/painel.css">
+</head>
+<body>
+  <div class="aviso aviso--demo hidden" id="aviso-demo">Modo demonstração · dados fictícios</div>
+  <div class="aviso aviso--velho hidden" id="aviso-velho" role="status"></div>
+
+  <header class="topo">
+    <div class="marca">
+      <img src="/web/logo.png" alt="" class="marca__logo">
+      <div>
+        <p class="marca__nome">REDE HG</p>
+        <h1 class="marca__titulo">Painel de Manutenção</h1>
+      </div>
+    </div>
+    <div class="relogio" aria-live="off">
+      <p class="relogio__hora" id="hora">--:--</p>
+      <p class="relogio__data" id="data">&nbsp;</p>
+    </div>
+  </header>
+
+  <main class="corpo" id="corpo">
+    <section class="saude" aria-labelledby="t-saude">
+      <div class="saude__cabeca">
+        <h2 class="rotulo" id="t-saude">Saúde por frente</h2>
+        <p class="saude__total" id="saude-total">&nbsp;</p>
+      </div>
+      <ul class="frentes" id="frentes"></ul>
+    </section>
+
+    <section class="atencao" aria-labelledby="t-atencao">
+      <div class="atencao__cabeca">
+        <h2 class="rotulo" id="t-atencao">Veículos</h2>
+        <p class="atencao__total" id="atencao-total">&nbsp;</p>
+      </div>
+      <ul class="regra" aria-label="Como a cor de cada veículo é definida">
+        <li class="regra__item regra__item--vermelho"><i class="regra__ponto"></i><b id="n-vermelho">0</b> Vermelho: mais pendentes que em dia</li>
+        <li class="regra__item regra__item--laranja"><i class="regra__ponto"></i><b id="n-laranja">0</b> Laranja: meio a meio</li>
+        <li class="regra__item regra__item--verde"><i class="regra__ponto"></i><b id="n-verde">0</b> Verde: mais em dia que pendentes</li>
+      </ul>
+      <div class="lista" id="lista-janela">
+        <div class="lista__trilho" id="lista-trilho"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="tela-cheia hidden" id="tela-estado" role="status">
+    <img src="/web/logo.png" alt="" class="tela-cheia__logo">
+    <p class="tela-cheia__titulo" id="estado-titulo"></p>
+    <p class="tela-cheia__texto" id="estado-texto"></p>
+  </div>
+
+  <script src="/web/painel.js"></script>
+</body>
+</html>

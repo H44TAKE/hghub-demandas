@@ -1,0 +1,76 @@
+name: Release
+
+# Publica uma versao SOMENTE quando uma tag vX.Y.Z e enviada. Se os testes falharem, nada e publicado.
+#   git tag v1.0.1 && git push origin v1.0.1
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: write
+
+jobs:
+  testes:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest pyflakes
+      - name: A tag precisa ser igual a versao do codigo
+        shell: bash
+        run: |
+          V=$(python -c "from backend import versao; print(versao.__version__)")
+          test "v$V" = "${GITHUB_REF_NAME}" || { echo "Tag ${GITHUB_REF_NAME} diferente de backend/versao.py ($V)"; exit 1; }
+      - run: python tools/verificar_segredos.py
+      - run: python -m pyflakes backend tools tests app.py
+      - run: python -m pytest tests -q
+
+  publicar:
+    needs: testes
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+      - name: Instalar Inno Setup
+        run: choco install innosetup -y --no-progress
+      - name: Compilar (PyInstaller + Inno Setup)
+        run: python tools/build.py
+      - name: Manifesto assinado e checksums
+        shell: bash
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          VERSAO="${GITHUB_REF_NAME#v}"
+          test -n "$UPDATE_SIGNING_KEY" || { echo "Segredo UPDATE_SIGNING_KEY ausente"; exit 1; }
+          CHAVE=$(python -c "from backend import versao; print(versao.CHAVES_PUBLICAS_ATUALIZACAO[0])")
+          cd installer_output
+          git -C .. log -n 20 --pretty="- %s" --no-merges > ../notas.md || true
+          python ../tools/atualizacao.py manifesto --versao "$VERSAO" --instalador "HGhub-Setup-$VERSAO.exe" \
+            --repo "${GITHUB_REPOSITORY}" --notas ../notas.md --saida update-manifest.json
+          python ../tools/atualizacao.py assinar --manifesto update-manifest.json
+          python ../tools/atualizacao.py checksums "HGhub-Setup-$VERSAO.exe" update-manifest.json --saida SHA256SUMS.txt
+          # autoconferencia: a assinatura precisa bater com a chave publica embutida no app
+          python ../tools/atualizacao.py verificar --manifesto update-manifest.json --assinatura update-manifest.json.sig --chave-publica "$CHAVE"
+      - name: Criar o release no GitHub
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSAO="${GITHUB_REF_NAME#v}"
+          gh release create "${GITHUB_REF_NAME}" \
+            "installer_output/HGhub-Setup-$VERSAO.exe" installer_output/update-manifest.json \
+            installer_output/update-manifest.json.sig installer_output/SHA256SUMS.txt \
+            --title "HGhub $VERSAO" --notes-file notas.md --latest

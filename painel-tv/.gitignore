@@ -1,0 +1,4 @@
+credenciais.json
+painel.log*
+.perfil-edge/
+__pycache__/

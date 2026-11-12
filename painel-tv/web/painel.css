@@ -1,0 +1,201 @@
+/* ============================================================
+   Painel de TV · Manutenção REDE HG
+   Tudo é dimensionado em `rem`, e o `rem` acompanha a ALTURA da tela
+   (1rem = 1/54 da altura): o desenho é o mesmo em 1080p, 4K ou qualquer TV.
+   Escuro de propósito: uma TV ligada o dia todo cansa menos e as cores de
+   status (vermelho / âmbar / verde) se leem de longe.
+   ============================================================ */
+
+:root {
+  color-scheme: dark;
+
+  --fundo: #0a0f1c;
+  --painel: #111a2e;
+  --painel-2: #16213a;
+  --linha: #1f2c48;
+  --texto: #eaf0fb;
+  --texto-2: #a3b3cf;
+  --texto-3: #8294b3;
+
+  --marca: #f5b800;          /* dourado REDE HG: único destaque de marca */
+  --urgente: #ff5a5f;
+  --urgente-fundo: rgba(255, 90, 95, 0.12);
+  --programar: #ffb020;
+  --programar-fundo: rgba(255, 176, 32, 0.12);
+  --em-dia: #2fd18b;
+  --em-dia-fundo: rgba(47, 209, 139, 0.12);
+
+  --raio: 0.9rem;
+  --fonte: "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: calc(100vh / 54); }
+
+body {
+  height: 100vh;
+  overflow: hidden;            /* TV: nada de barra de rolagem, nunca */
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: var(--fonte);
+  font-size: 1rem;
+  line-height: 1.25;
+  cursor: none;                /* sem mouse na TV */
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 1.4rem 2rem 1.6rem;
+  gap: 1.2rem;
+}
+
+.hidden { display: none !important; }
+
+/* ---------- avisos ---------- */
+.aviso {
+  position: fixed;
+  z-index: 5;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.35rem 1.2rem;
+  border-radius: 0 0 0.7rem 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.aviso--demo { top: 0; background: var(--marca); color: #1a1300; text-transform: uppercase; }
+.aviso--velho { top: 0; background: var(--programar); color: #1f1400; }
+.aviso--demo:not(.hidden) ~ .aviso--velho:not(.hidden) { top: 1.9rem; border-radius: 0.7rem; }
+
+/* ---------- topo ---------- */
+.topo { display: flex; align-items: center; justify-content: space-between; }
+
+.marca { display: flex; align-items: center; gap: 1.1rem; }
+.marca__logo { height: 3.6rem; width: auto; }
+.marca__nome { font-size: 0.95rem; font-weight: 600; letter-spacing: 0.2em; color: var(--marca); }
+.marca__titulo { font-size: 2.1rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.05; }
+
+.relogio { text-align: right; }
+.relogio__hora { font-size: 3rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.relogio__data { margin-top: 0.25rem; font-size: 1rem; color: var(--texto-2); }
+
+/* ---------- corpo ---------- */
+.corpo { display: grid; grid-template-columns: 31rem 1fr; gap: 1.6rem; min-height: 0; }
+
+.rotulo { font-size: 0.95rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--texto-2); }
+.rotulo--espaco { margin-top: 1.3rem; }
+
+/* ---------- coluna da saúde (um cartão por frente) ---------- */
+.saude {
+  background: var(--painel);
+  border: 1px solid var(--linha);
+  border-radius: var(--raio);
+  padding: 1.3rem 1.4rem 1.4rem;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.saude__cabeca { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 1rem; }
+.saude__total { font-size: 1rem; color: var(--texto-2); font-variant-numeric: tabular-nums; }
+
+.frentes { list-style: none; flex: 1; min-height: 0; display: grid; grid-auto-rows: 1fr; gap: 0.65rem; }
+
+.frente {
+  --cor: var(--em-dia);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto auto;
+  align-content: center;
+  column-gap: 0.8rem;
+  row-gap: 0.15rem;
+  padding: 0.55rem 1.1rem 0.7rem 1.1rem;
+  background: var(--painel-2);
+  border-radius: 0.8rem;
+  border-left: 0.4rem solid var(--cor);
+  min-height: 0;
+}
+.frente--media { --cor: var(--programar); }
+.frente--ruim { --cor: var(--urgente); }
+
+.frente__nome { align-self: end; font-size: 1.3rem; font-weight: 700; line-height: 1.1; }
+.frente__pct { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-size: 3rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--cor); }
+.frente__contagem { align-self: start; font-size: 0.88rem; color: var(--texto-2); white-space: nowrap; }
+.frente__contagem .n { font-weight: 700; font-variant-numeric: tabular-nums; margin-left: 0.5rem; }
+.frente__contagem .n:first-child { margin-left: 0; }
+.n--urgente { color: var(--urgente); }
+.n--programar { color: var(--programar); }
+.n--emdia { color: var(--em-dia); }
+.frente__barra { grid-column: 1 / -1; margin-top: 0.4rem; height: 0.45rem; background: var(--painel); border-radius: 0.45rem; overflow: hidden; }
+.frente__barra i { display: block; height: 100%; border-radius: 0.45rem; background: var(--cor); transition: width 1s cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* ---------- coluna da lista ---------- */
+.atencao {
+  background: var(--painel);
+  border: 1px solid var(--linha);
+  border-radius: var(--raio);
+  padding: 1.3rem 1.4rem 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.atencao__cabeca { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.7rem; }
+.atencao__total { font-size: 1rem; color: var(--texto-2); font-variant-numeric: tabular-nums; }
+
+/* a regra das cores, sempre visível, com quantos veículos há em cada uma */
+.regra { list-style: none; display: flex; flex-wrap: wrap; gap: 0.3rem 1.6rem; margin-bottom: 0.5rem; font-size: 0.95rem; color: var(--texto-2); }
+.regra__item { --cor: var(--urgente); display: inline-flex; align-items: center; gap: 0.5rem; }
+.regra__item--laranja { --cor: var(--programar); }
+.regra__item--verde { --cor: var(--em-dia); }
+.regra__ponto { width: 0.85rem; height: 0.85rem; border-radius: 50%; background: var(--cor); }
+.regra__item b { color: var(--cor); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+
+.lista { position: relative; flex: 1; min-height: 0; overflow: hidden;
+  /* esmaece nas bordas: a lista "entra e sai" em vez de ser cortada seca */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.4rem, #000 calc(100% - 1.8rem), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 1.4rem, #000 calc(100% - 1.8rem), transparent 100%);
+}
+.lista__trilho { will-change: transform; padding: 1.2rem 0; }
+
+.linha {
+  --cor: var(--urgente);
+  --fundo-cor: var(--urgente-fundo);
+  display: grid;
+  grid-template-columns: 17rem 1fr;
+  align-items: center;
+  gap: 1.2rem;
+  min-height: 5rem;
+  margin-bottom: 0.65rem;
+  padding: 0.6rem 1.2rem 0.6rem 1.4rem;
+  background: var(--painel-2);
+  border-radius: 0.8rem;
+  border-left: 0.45rem solid var(--cor);
+  background: linear-gradient(90deg, var(--fundo-cor), var(--painel-2) 55%);
+}
+.linha--laranja { --cor: var(--programar); --fundo-cor: var(--programar-fundo); }
+.linha--verde { --cor: var(--em-dia); --fundo-cor: var(--em-dia-fundo); }
+
+.linha__placa { font-size: 2.7rem; font-weight: 700; line-height: 1; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; font-variation-settings: "wdth" 92; }
+.linha__id { display: grid; gap: 0.3rem; }
+.linha__tipo { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--texto-2); white-space: nowrap; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
+.chip { padding: 0.4rem 0.9rem; border-radius: 2rem; font-size: 1.1rem; font-weight: 700; white-space: nowrap; }
+.chip--urgente { background: var(--urgente); color: #200507; }
+.chip--programar { background: var(--programar-fundo); color: var(--programar); box-shadow: inset 0 0 0 0.12rem var(--programar); }
+.chip--emdia { background: var(--em-dia-fundo); color: var(--em-dia); box-shadow: inset 0 0 0 0.12rem rgba(47, 209, 139, 0.55); }
+
+.vazio { height: 100%; display: grid; place-content: center; text-align: center; gap: 0.6rem; }
+.vazio__titulo { font-size: 2.2rem; font-weight: 700; color: var(--em-dia); }
+.vazio__texto { font-size: 1.2rem; color: var(--texto-2); }
+
+/* ---------- carregando / não configurado ---------- */
+.tela-cheia {
+  position: fixed; inset: 0; z-index: 10; background: var(--fundo);
+  display: grid; place-content: center; text-align: center; gap: 1rem; padding: 4rem;
+}
+.tela-cheia__logo { height: 7rem; width: auto; margin: 0 auto 0.5rem; }
+.tela-cheia__titulo { font-size: 2.6rem; font-weight: 700; }
+.tela-cheia__texto { font-size: 1.3rem; color: var(--texto-2); max-width: 52rem; line-height: 1.45; }
+
+@media (prefers-reduced-motion: reduce) {
+  .frente__barra i { transition: none; }
+}

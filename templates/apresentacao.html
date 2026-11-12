@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HGhub · Apresentação</title>
+<script>document.documentElement.classList.add('js');</script>
+<link rel="icon" href="/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/apresentacao.css') }}">
+</head>
+<body>
+
+<div class="fundo" aria-hidden="true">
+  <div class="fundo__luz"></div>
+  <div class="fundo__grao"></div>
+</div>
+
+<main class="palco" id="palco">
+
+  <!-- 1 · O Despertar -->
+  <section class="cena cena-1" data-cena="1" aria-label="O despertar">
+    <div class="batimento" aria-hidden="true"></div>
+    <div class="marca marca--abertura">
+      <div class="marca__halo" aria-hidden="true"></div>
+      <div class="marca__logo-caixa"><img class="marca__logo" src="/logo.png" alt=""></div>
+      <p class="marca__nome" aria-label="HGhub"><span>H</span><span>G</span><span>h</span><span>u</span><span>b</span></p>
+    </div>
+    <div class="frases" aria-live="polite">
+      <p class="frase" data-frase="1">Não é apenas uma planilha.</p>
+      <p class="frase" data-frase="2">Não é apenas um sistema.</p>
+      <p class="frase" data-frase="3">É o <em>coração</em> da sua frota.</p>
+    </div>
+  </section>
+
+  <!-- 2 · A Sincronização -->
+  <section class="cena cena-2" data-cena="2" aria-label="Sincronização bidirecional">
+    <div class="cena__visual">
+      <div class="sync">
+        <div class="orbe orbe--planilha">
+          <div class="orbe__luz" aria-hidden="true"></div>
+          <div class="orbe__nucleo" aria-hidden="true">
+            <svg class="orbe__icone" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/>
+              <path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10"/>
+            </svg>
+          </div>
+          <p class="orbe__rotulo">Planilha na nuvem</p>
+        </div>
+
+        <div class="feixe">
+          <div class="feixe__linha" aria-hidden="true"></div>
+          <div class="feixe__pulso" aria-hidden="true"></div>
+          <div class="feixe__pacotes" id="pacotes" aria-hidden="true"></div>
+          <p class="feixe__legenda feixe__legenda--ida">leitura →</p>
+          <p class="feixe__legenda feixe__legenda--volta">← write-back</p>
+        </div>
+
+        <div class="orbe orbe--app">
+          <div class="orbe__luz" aria-hidden="true"></div>
+          <div class="orbe__nucleo" aria-hidden="true">
+            <img class="orbe__logo" src="/logo.png" alt="">
+          </div>
+          <p class="orbe__rotulo">HGhub</p>
+        </div>
+      </div>
+    </div>
+    <div class="legenda">
+      <h2 class="titulo">Sincronização bidirecional.</h2>
+      <p class="subtitulo">Cada edição volta para a planilha, célula por célula.</p>
+    </div>
+  </section>
+
+  <!-- 3 · A Inteligência do Tempo -->
+  <section class="cena cena-3" data-cena="3" aria-label="A inteligência do tempo">
+    <div class="cena__visual">
+      <div class="tempo">
+        <div class="velocimetro" id="velocimetro">
+          <svg viewBox="0 0 400 400" aria-hidden="true">
+            <g id="velocimetro-segmentos"></g>
+            <g class="velocimetro__ponteiro" id="velocimetro-ponteiro">
+              <line x1="200" y1="200" x2="200" y2="82"/>
+            </g>
+            <circle class="velocimetro__eixo" cx="200" cy="200" r="9"/>
+          </svg>
+          <p class="velocimetro__leitura" aria-hidden="true"><span id="km-valor">0</span><small>km</small></p>
+        </div>
+
+        <div class="anel" id="anel">
+          <svg viewBox="0 0 400 400" aria-hidden="true">
+            <circle class="anel__trilho" cx="200" cy="200" r="150"/>
+            <circle class="anel__luz" cx="200" cy="200" r="150"/>
+            <g class="anel__cabeca"><circle cx="200" cy="50" r="7"/></g>
+          </svg>
+          <p class="anel__contador" aria-hidden="true"><span id="dias-valor">0</span><small>dias</small></p>
+        </div>
+      </div>
+    </div>
+    <div class="legenda">
+      <h2 class="titulo">+180 Dias. <span class="titulo__destaque">Precisão Matemática.</span></h2>
+      <p class="subtitulo">Implemento não tem motor. Tem calendário.</p>
+    </div>
+  </section>
+
+  <!-- 4 · O Status Global -->
+  <section class="cena cena-4" data-cena="4" aria-label="O status global">
+    <svg class="constelacao-linhas" id="constelacao-linhas" aria-hidden="true"></svg>
+    <div class="constelacao" id="constelacao" aria-hidden="true"></div>
+    <div class="onda" id="onda" aria-hidden="true"></div>
+    <div class="placa">
+      <div class="placa__vidro" aria-hidden="true"></div>
+      <h2 class="titulo titulo--grande">
+        <span class="placa__linha">Controle Absoluto.</span>
+        <span class="placa__linha">Previsibilidade Total.</span>
+      </h2>
+    </div>
+  </section>
+
+  <!-- 5 · Assinatura -->
+  <section class="cena cena-5" data-cena="5" aria-label="HGhub">
+    <div class="assinatura">
+      <div class="marca marca--final">
+        <div class="marca__halo" aria-hidden="true"></div>
+        <div class="marca__logo-caixa">
+          <img class="marca__logo" src="/logo.png" alt="">
+          <span class="marca__brilho" aria-hidden="true"></span>
+        </div>
+        <p class="marca__nome">HGhub</p>
+      </div>
+      <a class="botao-iniciar" href="/">
+        Iniciar Operação
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <button class="botao-rever" type="button" id="rever">Assistir de novo</button>
+    </div>
+  </section>
+
+</main>
+
+<div class="controles">
+  <button class="controle" type="button" id="som" aria-pressed="false">
+    <svg class="controle__icone controle__icone--mudo" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>
+    </svg>
+    <svg class="controle__icone controle__icone--ligado" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>
+    </svg>
+    <span id="som-rotulo">Ativar som</span>
+  </button>
+  <button class="controle" type="button" id="pular">
+    Pular
+    <svg class="controle__icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l6 6-6 6M13 6l6 6-6 6"/></svg>
+  </button>
+</div>
+
+<script src="{{ url_for('static', filename='js/apresentacao.js') }}"></script>
+</body>
+</html>

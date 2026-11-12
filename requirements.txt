@@ -1,0 +1,8 @@
+# Versoes testadas (Python 3.14). Atualize com cuidado e rode a bateria completa de testes.
+flask==3.1.3
+pywebview==6.2.1
+pandas==3.0.5
+openpyxl==3.1.5
+google-auth==2.58.0
+google-api-python-client==2.200.0
+cryptography==50.0.1

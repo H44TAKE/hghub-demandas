@@ -1,0 +1,73 @@
+# ==========================================================================
+# SEGREDOS E DADOS DO SISTEMA - NUNCA VERSIONAR (em qualquer pasta)
+# ==========================================================================
+credenciais*.json
+*.pem
+*.key
+*.pfx
+.env
+.env.*
+config.json
+usuarios.json
+dados_sistema_hg.json
+dados_*.json
+permissoes_contas.json
+veiculos_ocultos.json
+sessao_hg.json
+*.lock
+fotos_usuarios/
+anexos_tarefas/
+*.log
+*.log.*
+# modelos de configuracao SEM segredos sao permitidos
+!config.example.json
+
+# ==========================================================================
+# ARTEFATOS DE BUILD E DISTRIBUICAO
+# ==========================================================================
+build/
+dist/
+output/
+release/
+installer_output/
+*.exe
+*.msi
+*.zip
+*.spec.bak
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+node_modules/
+.perfil-edge/
+
+# ==========================================================================
+# LEGADO, BACKUPS E AREA DE TRABALHO LOCAL (fora do repositorio)
+# ==========================================================================
+backup_*/
+brag-output/
+appmat.py
+new/
+/index.html
+*.lnk
+.claude/
+.agents/
+.impeccable/
+# a base de conhecimento (Obsidian) e do usuario, fica fora do codigo publicado
+appmatheus/
+hghub_*.tmp
+*.tmp
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
+
+# arquivos internos da empresa / da ferramenta de desenvolvimento (ficam so no PC local)
+CLAUDE.md
+PRODUCT.md
+skills-lock.json
+limpar_residuo_qa.py
+SENHA_INICIAL_ADMIN.txt
+notas.md

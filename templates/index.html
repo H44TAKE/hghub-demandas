@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>REDE HG · Sistema de Demandas</title>
+
+<script>
+  // Aplica o tema antes da primeira pintura para não haver flash de tela clara.
+  (function () {
+    try {
+      var salvo = localStorage.getItem('hg_theme');
+      var escuro = salvo ? salvo === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', escuro ? 'dark' : 'light');
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  })();
+</script>
+
+<link rel="icon" href="/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+</head>
+<body>
+
+<div id="progresso-global" class="progresso-global" aria-hidden="true"></div>
+
+<!-- ============================ LOGIN ============================ -->
+<div id="login-screen" class="login">
+  <aside class="login__brand">
+    <div class="login__mark">
+      <div class="login__mark-logo"><img src="/logo.png" alt=""></div>
+      <div>
+        <strong>REDE HG</strong>
+        <span>Transportadora</span>
+      </div>
+    </div>
+
+    <div class="login__pitch">
+      <h2>Demandas sob controle.</h2>
+      <p>Pastas, projetos e tarefas da operação em um só lugar: prazos visíveis, responsáveis definidos e histórico de tudo que foi feito.</p>
+      <div class="login__stats">
+        <div class="login__stat">
+          <strong>Kanban</strong>
+          <span>Fluxo visual</span>
+        </div>
+        <div class="login__stat">
+          <strong>Prazos</strong>
+          <span>Alerta de atraso</span>
+        </div>
+        <div class="login__stat">
+          <strong>Histórico</strong>
+          <span>Rastreabilidade</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="login__legal">REDE HG Transportadora · Sistema interno de gestão de demandas</p>
+  </aside>
+
+  <main class="login__panel">
+    <form id="form-login" class="login__form" novalidate>
+      <div class="login__logo-mobile">
+        <div class="login__mark-logo"><img src="/logo.png" alt=""></div>
+        <div>
+          <strong style="font-size:16px;font-weight:640">REDE HG</strong>
+          <span style="display:block;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold-ink);font-weight:620">Transportadora</span>
+        </div>
+      </div>
+
+      <h1>Entrar</h1>
+      <p>Acesse com sua conta corporativa.</p>
+
+      <div class="login__fields">
+        <div class="field">
+          <label class="field__label" for="login-email">E-mail</label>
+          <div class="input-icon">
+            <i class="ph ph-envelope-simple"></i>
+            <input type="email" id="login-email" class="input" placeholder="nome@redehg.com" autocomplete="username" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="login-senha">Senha</label>
+          <div class="input-icon">
+            <i class="ph ph-lock-key"></i>
+            <input type="password" id="login-senha" class="input" placeholder="Sua senha" autocomplete="current-password" required>
+            <button type="button" class="input-icon__action" data-action="toggle-password" data-target="login-senha" aria-label="Mostrar senha">
+              <i class="ph ph-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="login__row">
+          <button type="button" class="link-btn" data-action="open-recovery">Esqueci minha senha</button>
+        </div>
+
+        <button type="submit" class="btn btn--primary btn--block" id="btn-login">
+          <span>Entrar</span>
+          <i class="ph ph-arrow-right"></i>
+        </button>
+      </div>
+
+      <p class="login__foot">
+        Ainda não tem acesso?
+        <button type="button" class="link-btn link-btn--brand" data-action="open-signup">Criar conta</button>
+      </p>
+    </form>
+  </main>
+</div>
+
+<!-- ============================ APLICAÇÃO ============================ -->
+<div id="app-screen" class="app hidden">
+
+  <!-- Barra lateral -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <div class="sidebar__logo"><img src="/logo.png" alt=""></div>
+      <div class="sidebar__name">
+        <strong>REDE HG</strong>
+        <span>Demandas</span>
+      </div>
+    </div>
+
+    <nav class="sidebar__nav" aria-label="Navegação principal">
+      <p class="nav-label">Navegação</p>
+
+      <button class="nav-item is-active" data-action="nav" data-view="dashboard">
+        <i class="ph ph-chart-pie-slice"></i>
+        <span>Visão geral</span>
+        <kbd class="nav-item__key">1</kbd>
+      </button>
+      <button class="nav-item" data-action="nav" data-view="pastas">
+        <i class="ph ph-folders"></i>
+        <span>Estrutura</span>
+        <kbd class="nav-item__key">2</kbd>
+      </button>
+      <button class="nav-item" data-action="nav" data-view="quadro">
+        <i class="ph ph-kanban"></i>
+        <span>Quadro</span>
+        <kbd class="nav-item__key">3</kbd>
+      </button>
+      <button class="nav-item" data-action="nav" data-view="calendario">
+        <i class="ph ph-calendar-blank"></i>
+        <span>Calendário</span>
+        <kbd class="nav-item__key">4</kbd>
+      </button>
+
+      <div id="nav-manutencao-bloco" class="hidden">
+        <button class="nav-item" data-action="nav" data-view="manutencao">
+          <i class="ph ph-truck"></i>
+          <span>Frota &amp; Manutenção</span>
+        </button>
+      </div>
+
+      <p class="nav-label" style="margin-top:12px">Relatórios</p>
+      <button class="nav-item" data-action="export">
+        <i class="ph ph-microsoft-excel-logo"></i>
+        <span>Exportar Excel</span>
+      </button>
+
+      <div id="nav-admin-bloco" class="hidden">
+        <p class="nav-label" style="margin-top:12px">Administração</p>
+        <button class="nav-item" data-action="open-admin-usuarios">
+          <i class="ph ph-users-three"></i>
+          <span>Gerenciar usuários</span>
+        </button>
+      </div>
+    </nav>
+
+    <div class="sidebar__foot">
+      <div class="user-card">
+        <label class="avatar-edit" title="Alterar foto de perfil">
+          <span class="avatar avatar--lg" id="user-avatar-sidebar">A</span>
+          <span class="avatar-edit__badge"><i class="ph-fill ph-camera"></i></span>
+          <input type="file" id="avatar-upload" accept="image/*" class="sr-only" data-action="change-avatar">
+        </label>
+
+        <div class="user-card__info">
+          <div class="user-card__name">
+            <strong id="user-name-sidebar">Admin</strong>
+            <button class="user-card__edit" data-action="edit-name" aria-label="Editar nome">
+              <i class="ph ph-pencil-simple"></i>
+            </button>
+          </div>
+          <p class="user-card__status"><span class="dot"></span> Conectado</p>
+          <span class="badge badge--brand" id="user-card-setor" style="margin-top:6px"></span>
+        </div>
+      </div>
+
+      <div class="sidebar__actions">
+        <button class="sidebar__action" data-action="toggle-theme" title="Alternar tema">
+          <i class="ph ph-moon" id="theme-icon"></i>
+          <span id="theme-label">Tema</span>
+        </button>
+        <button class="sidebar__action" data-action="abrir-atualizacoes" title="Versão do sistema e atualizações" id="btn-atualizacoes">
+          <i class="ph ph-arrows-clockwise"></i>
+          <span>Atualizações</span>
+          <span class="sidebar__dot hidden" id="atualizacao-ponto" aria-label="Há atualização disponível"></span>
+        </button>
+        <button class="sidebar__action sidebar__action--exit" data-action="logout" title="Sair do sistema">
+          <i class="ph ph-sign-out"></i>
+          <span>Sair</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Área principal -->
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar__title">
+        <button class="icon-btn" data-action="toggle-sidebar" aria-label="Recolher menu">
+          <i class="ph ph-sidebar-simple"></i>
+        </button>
+        <div class="topbar__divider"></div>
+        <div style="min-width:0">
+          <h1 id="header-title">Visão geral</h1>
+          <p id="header-subtitle">Métricas e prazos da operação.</p>
+        </div>
+      </div>
+
+      <div class="topbar__actions">
+        <div class="topbar__date">
+          <i class="ph ph-calendar-dots"></i>
+          <span id="current-date" class="num"></span>
+        </div>
+
+        <div class="notif" id="notif-wrapper">
+          <button class="icon-btn icon-btn--bordered" data-action="toggle-notifications" aria-label="Notificações">
+            <i class="ph ph-bell"></i>
+            <span class="notif__badge hidden" id="notif-badge"></span>
+          </button>
+
+          <div class="popover hidden" id="notif-panel">
+            <div class="popover__head">
+              <h4>Notificações</h4>
+              <span class="badge badge--gold num" id="notif-count">0</span>
+            </div>
+            <div class="popover__list" id="notif-list"></div>
+          </div>
+        </div>
+
+        <div class="topbar__divider"></div>
+
+        <label class="avatar-edit avatar-edit--light" title="Alterar foto de perfil">
+          <span class="avatar avatar--md" id="user-avatar-header">A</span>
+          <span class="avatar-edit__badge"><i class="ph-fill ph-camera"></i></span>
+          <input type="file" id="avatar-upload-header" accept="image/*" class="sr-only" data-action="change-avatar">
+        </label>
+      </div>
+    </header>
+
+    <main class="content" id="content">
+
+      <!-- ---------- VISÃO GERAL ---------- -->
+      <section id="view-dashboard" class="view">
+        <div class="filters hidden" id="dash-filtro-setor" style="margin-bottom:16px">
+          <i class="ph ph-buildings" style="color:var(--text-3);font-size:16px"></i>
+          <select id="dash-setor" class="select select--auto"></select>
+          <button class="btn btn--secondary btn--sm" data-action="export-setor">
+            <i class="ph ph-microsoft-excel-logo"></i> Exportar este setor
+          </button>
+        </div>
+
+        <div class="kpis" id="kpis"></div>
+
+        <div class="dash-grid">
+          <div class="panel">
+            <div class="panel__head">
+              <div>
+                <h3 class="panel__title">Progresso por pasta</h3>
+                <p class="panel__sub">Concluídas e pendentes lado a lado</p>
+              </div>
+              <div class="legend">
+                <span class="legend__item"><span class="dot" style="background:var(--green)"></span> Concluídas</span>
+                <span class="legend__item"><span class="dot" style="background:var(--gold)"></span> Pendentes</span>
+              </div>
+            </div>
+            <div class="panel__body">
+              <div class="chart-box"><canvas id="chart-pastas"></canvas></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel__head">
+              <div>
+                <h3 class="panel__title">Prioridades</h3>
+                <p class="panel__sub">Distribuição das demandas</p>
+              </div>
+            </div>
+            <div class="panel__body">
+              <div class="chart-box"><canvas id="chart-prioridade"></canvas></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel__head">
+              <div>
+                <h3 class="panel__title">Prazos em foco</h3>
+                <p class="panel__sub">Atrasos primeiro, depois o que vence</p>
+              </div>
+            </div>
+            <div class="panel__body panel__body--flush">
+              <div class="deadline-list" id="deadline-list"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel__head">
+              <div>
+                <h3 class="panel__title">Responsáveis</h3>
+                <p class="panel__sub">Quem carrega mais demandas</p>
+              </div>
+            </div>
+            <div class="panel__body panel__body--flush">
+              <div class="rank" id="rank-responsaveis"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel__head">
+              <div>
+                <h3 class="panel__title">Cidades</h3>
+                <p class="panel__sub">Onde as demandas acontecem</p>
+              </div>
+            </div>
+            <div class="panel__body panel__body--flush">
+              <div class="rank" id="rank-cidades"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- ESTRUTURA ---------- -->
+      <section id="view-pastas" class="view hidden">
+        <div class="view__bar">
+          <p class="view__hint"><i class="ph ph-tree-structure"></i> Pastas contêm projetos, que contêm as tarefas.</p>
+          <button class="btn btn--primary btn--sm" data-action="new-folder">
+            <i class="ph ph-plus"></i> Nova pasta
+          </button>
+        </div>
+
+        <div class="filters">
+          <div class="input-icon filters__search">
+            <i class="ph ph-magnifying-glass"></i>
+            <input type="search" id="filtro-busca" class="input" placeholder="Buscar por título, responsável, cidade...">
+          </div>
+          <select id="filtro-status" class="select select--auto">
+            <option value="">Todos os status</option>
+            <option value="Pendente">Pendente</option>
+            <option value="Em Andamento">Em andamento</option>
+            <option value="Concluída">Concluída</option>
+            <option value="Cancelada">Cancelada</option>
+          </select>
+          <select id="filtro-prioridade" class="select select--auto">
+            <option value="">Todas as prioridades</option>
+            <option value="Alta">Alta</option>
+            <option value="Média">Média</option>
+            <option value="Baixa">Baixa</option>
+          </select>
+          <select id="filtro-responsavel" class="select select--auto">
+            <option value="">Todos os responsáveis</option>
+          </select>
+          <button class="icon-btn icon-btn--bordered" data-action="clear-filters" title="Limpar filtros" aria-label="Limpar filtros">
+            <i class="ph ph-arrow-counter-clockwise"></i>
+          </button>
+        </div>
+
+        <div id="favoritos-bloco" class="hidden">
+          <p class="section-title"><i class="ph-fill ph-star" style="color:var(--gold)"></i> Favoritos</p>
+          <div class="fav-grid" id="favoritos-lista"></div>
+        </div>
+
+        <div class="folder-list" id="lista-pastas"></div>
+      </section>
+
+      <!-- ---------- QUADRO ---------- -->
+      <section id="view-quadro" class="view view--full hidden">
+        <div class="view__bar">
+          <p class="view__hint"><i class="ph ph-hand-grabbing"></i> Arraste os cartões entre as colunas para mudar o status.</p>
+        </div>
+        <div class="board" id="kanban-board"></div>
+      </section>
+
+      <!-- ---------- CALENDÁRIO ---------- -->
+      <section id="view-calendario" class="view view--full hidden">
+        <div class="cal-head">
+          <div class="cal-nav">
+            <button class="icon-btn" data-action="cal-move" data-delta="-1" aria-label="Mês anterior">
+              <i class="ph ph-caret-left"></i>
+            </button>
+            <h2 id="cal-titulo">—</h2>
+            <button class="icon-btn" data-action="cal-move" data-delta="1" aria-label="Próximo mês">
+              <i class="ph ph-caret-right"></i>
+            </button>
+            <button class="btn btn--secondary btn--sm" data-action="cal-today" style="margin-left:8px">Hoje</button>
+          </div>
+          <div class="cal-legend">
+            <span class="legend__item"><span class="dot" style="background:var(--gold)"></span> Hoje</span>
+            <span class="legend__item"><span class="dot" style="background:var(--brand)"></span> Com demandas</span>
+          </div>
+        </div>
+
+        <div class="calendar">
+          <div class="cal-weekdays">
+            <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+        </div>
+      </section>
+
+      <!-- ---------- FROTA & MANUTENÇÃO ---------- -->
+      <section id="view-manutencao" class="view">
+        <div class="card empty hidden" id="manut-nao-configurado">
+          <div class="empty__icon"><i class="ph ph-plug"></i></div>
+          <p class="empty__title">Integração com o Google Sheets ainda não configurada</p>
+          <p class="empty__text" id="manut-nao-configurado-msg">Peça para a Conta Mestre configurar a credencial de Service Account e o ID da planilha.</p>
+        </div>
+
+        <!-- Página de análise de um card do Dashboard (preenchida por manutencao_detalhe.js) -->
+        <div id="manut-detalhe" class="mdet hidden">
+          <div class="mdet__topo">
+            <button type="button" class="btn btn--secondary" id="mdet-voltar" data-action="manut-detalhe-voltar">
+              <i class="ph ph-arrow-left"></i> Voltar ao Dashboard
+            </button>
+            <nav class="mdet__trilha" aria-label="Você está em">
+              <span>Frota &amp; Manutenção</span><i class="ph ph-caret-right"></i>
+              <span>Dashboard</span><i class="ph ph-caret-right"></i>
+              <strong id="mdet-trilha-atual">—</strong>
+            </nav>
+            <div class="segmented segmented--frota">
+              <button type="button" class="segmented__opt is-active" data-action="manut-filtro-tipo" data-tipo="ambos">
+                <i class="ph ph-stack"></i> Ambos (Todos)
+              </button>
+              <button type="button" class="segmented__opt" data-action="manut-filtro-tipo" data-tipo="cavalo">
+                <i class="ph ph-truck"></i> Apenas Cavalos
+              </button>
+              <button type="button" class="segmented__opt" data-action="manut-filtro-tipo" data-tipo="carreta">
+                <i class="ph ph-truck-trailer"></i> Apenas Carretas
+              </button>
+            </div>
+          </div>
+          <div class="mdet__corpo" id="mdet-corpo"></div>
+        </div>
+
+        <div id="manut-conteudo">
+          <div class="mhero__head">
+            <div>
+              <h2 class="mhero__title">Frota &amp; Manutenção</h2>
+              <p class="mhero__subtitle">Visão executiva e prontuário completo de todos os veículos monitorados, direto da planilha.</p>
+            </div>
+            <div class="mhero__busca">
+              <div class="input-icon">
+                <i class="ph ph-identification-card"></i>
+                <input type="search" id="prontuario-busca" class="input" placeholder="Placa do cavalo ou carreta..." autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="prontuario-sugestoes">
+                <div class="autocomplete-lista hidden" id="prontuario-sugestoes" role="listbox"></div>
+              </div>
+              <button type="button" class="btn btn--secondary" data-action="abrir-prontuario">
+                <i class="ph ph-file-text"></i> Ver prontuário
+              </button>
+              <button type="button" class="btn btn--secondary" data-action="abrir-importar-manutencao" title="Substituir a planilha inteira no Drive">
+                <i class="ph ph-cloud-arrow-up"></i> Sincronizar base
+              </button>
+            </div>
+          </div>
+
+          <nav class="mtabs" id="manut-tabs">
+            <button type="button" class="mtab is-active" data-action="manut-tab" data-tab="dashboard">
+              <i class="ph ph-gauge"></i> Dashboard
+            </button>
+            <button type="button" class="mtab" data-action="manut-tab" data-tab="oleo">
+              <i class="ph ph-engine"></i> Revisões
+            </button>
+            <button type="button" class="mtab" data-action="manut-tab" data-tab="alinhamento">
+              <i class="ph ph-arrows-left-right"></i> Alinhamento
+            </button>
+            <button type="button" class="mtab" data-action="manut-tab" data-tab="integridade">
+              <i class="ph ph-shield-check"></i> Integridade do Chassi
+            </button>
+            <button type="button" class="mtab" data-action="manut-tab" data-tab="quinta-roda">
+              <i class="ph ph-steering-wheel"></i> Inspeção 5ª Roda
+            </button>
+            <button type="button" class="mtab" data-action="manut-tab" data-tab="carretas">
+              <i class="ph ph-truck-trailer"></i> Carretas
+            </button>
+            <button type="button" class="mtab" data-action="manut-tab" data-tab="sr-tanques">
+              <i class="ph ph-drop-half-bottom"></i> SR-Tanques
+            </button>
+            <button type="button" class="mtab" data-action="manut-tab" data-tab="cadastro">
+              <i class="ph ph-identification-badge"></i> Cadastro de Frota
+            </button>
+            <button type="button" class="mtab" data-action="manut-tab" data-tab="resumo">
+              <i class="ph ph-squares-four"></i> Resumo Analítico
+            </button>
+            <button type="button" class="mtab" data-action="manut-tab" data-tab="agendar">
+              <i class="ph ph-calendar-plus"></i> Agendar Demanda
+            </button>
+          </nav>
+
+          <div class="mtab-painel" id="manut-painel-dashboard" data-tab-painel="dashboard">
+            <section class="mhero" id="manut-dashboard">
+              <div class="mhero-toolbar">
+                <div class="segmented segmented--frota" id="manut-filtro-tipo-frota">
+                  <button type="button" class="segmented__opt is-active" data-action="manut-filtro-tipo" data-tipo="ambos">
+                    <i class="ph ph-stack"></i> Ambos (Todos)
+                  </button>
+                  <button type="button" class="segmented__opt" data-action="manut-filtro-tipo" data-tipo="cavalo">
+                    <i class="ph ph-truck"></i> Apenas Cavalos
+                  </button>
+                  <button type="button" class="segmented__opt" data-action="manut-filtro-tipo" data-tipo="carreta">
+                    <i class="ph ph-truck-trailer"></i> Apenas Carretas
+                  </button>
+                </div>
+              </div>
+
+              <button type="button" class="mhero-health mhero-health--neutro mhero-health--clicavel" id="manut-health-card"
+                      data-action="abrir-detalhe-saude" aria-label="Abrir a página de análise da Saúde da Frota">
+                <i class="ph ph-arrow-up-right mhero-kpi__seta"></i>
+                <div class="mhero-health__ring">
+                  <canvas id="manut-chart-health"></canvas>
+                  <div class="mhero-health__value" id="manut-health-valor">—</div>
+                </div>
+                <div class="mhero-health__body">
+                  <p class="mhero-health__label"><i class="ph ph-heartbeat"></i> Saúde da Frota</p>
+                  <p class="mhero-health__legenda" id="manut-health-legenda">Carregando indicadores…</p>
+                </div>
+              </button>
+
+              <div class="mfrente-cards" id="manut-cat-cards"></div>
+
+              <div class="mhero-charts">
+                <div class="mhero-chart">
+                  <div class="mhero-chart__head">
+                    <h3>Saúde da Frota</h3>
+                    <p>Proporção de veículos por status geral</p>
+                  </div>
+                  <div class="mhero-chart__body"><canvas id="manut-chart-saude"></canvas></div>
+                </div>
+                <div class="mhero-chart">
+                  <div class="mhero-chart__head">
+                    <h3>Próximas Manutenções</h3>
+                    <p>Volume de atenção por frente, cruzando todas as categorias</p>
+                  </div>
+                  <div class="mhero-chart__body"><canvas id="manut-chart-proximas"></canvas></div>
+                </div>
+              </div>
+
+              <div class="mhero-charts mhero-charts--secundario">
+                <div class="mhero-chart">
+                  <div class="mhero-chart__head">
+                    <h3>Previsão de Paradas</h3>
+                    <p>Manutenções programadas nos próximos 6 meses</p>
+                  </div>
+                  <div class="mhero-chart__body"><canvas id="manut-chart-previsao"></canvas></div>
+                </div>
+                <div class="mhero-chart mhero-chart--lista">
+                  <div class="mhero-chart__head">
+                    <h3><i class="ph ph-skull"></i> Top 5 Críticos</h3>
+                    <p>Mais frentes "Parar urgente" ao mesmo tempo</p>
+                  </div>
+                  <div class="mhero-hall" id="manut-hall-vergonha"></div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="mtab-painel hidden" id="manut-painel-oleo" data-tab-painel="oleo">
+            <div class="filters" style="margin-bottom:16px">
+              <div class="input-icon filters__search">
+                <i class="ph ph-magnifying-glass"></i>
+                <input type="search" id="manut-busca" class="input" placeholder="Buscar por placa, marca ou modelo...">
+              </div>
+              <select id="manut-filtro-status" class="select select--auto">
+                <option value="">Todos os status</option>
+                <option value="EM DIA">Em dia</option>
+                <option value="PROGRAMAR PARADA">Programar parada</option>
+                <option value="PARAR URGENTE">Parar urgente</option>
+              </select>
+              <button class="icon-btn icon-btn--bordered" data-action="reload-manutencao" aria-label="Atualizar dados" title="Buscar dados mais recentes do Sheets">
+                <i class="ph ph-arrow-clockwise"></i>
+              </button>
+            </div>
+            <div class="mlist" id="manut-lista"></div>
+          </div>
+
+          <div class="mtab-painel hidden" id="manut-painel-alinhamento" data-tab-painel="alinhamento">
+            <div class="mlist" id="manut-cat-alinhamento"></div>
+          </div>
+
+          <div class="mtab-painel hidden" id="manut-painel-integridade" data-tab-painel="integridade">
+            <div class="mlist" id="manut-cat-integridade_chassi"></div>
+          </div>
+
+          <div class="mtab-painel hidden" id="manut-painel-quinta-roda" data-tab-painel="quinta-roda">
+            <div class="mlist" id="manut-cat-quinta_roda"></div>
+          </div>
+
+          <div class="mtab-painel hidden" id="manut-painel-carretas" data-tab-painel="carretas">
+            <div class="mlist" id="manut-cat-preventiva_carretas"></div>
+          </div>
+
+          <div class="mtab-painel hidden" id="manut-painel-sr-tanques" data-tab-painel="sr-tanques">
+            <div class="mlist" id="manut-cat-sr_tanques"></div>
+          </div>
+
+          <div class="mtab-painel hidden" id="manut-painel-cadastro" data-tab-painel="cadastro">
+            <div class="filters" style="margin-bottom:16px">
+              <div class="input-icon filters__search">
+                <i class="ph ph-magnifying-glass"></i>
+                <input type="search" id="cadastro-busca" class="input" placeholder="Buscar por placa, marca ou modelo...">
+              </div>
+              <button type="button" class="btn btn--primary" data-action="abrir-novo-veiculo">
+                <i class="ph ph-plus"></i> Novo Veículo/Carreta
+              </button>
+            </div>
+
+            <p class="cadastro-dica"><i class="ph ph-eye-slash"></i><span>Em <strong>Gerenciar</strong>, desligue o veículo que não deve aparecer nas telas de Manutenção (Dashboard, análises, abas e Resumo). Nada é apagado da planilha &mdash; é só ligar de novo para ele voltar.</span></p>
+
+            <div class="data-table-wrap" id="cadastro-tabela-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Tipo</th><th>Placa</th><th>Marca</th><th>Modelo</th><th>Ano</th><th>Centro de custo / Implemento</th><th class="data-table__acoes">Gerenciar</th>
+                  </tr>
+                </thead>
+                <tbody id="cadastro-tabela-corpo"></tbody>
+              </table>
+            </div>
+            <div class="card empty hidden" id="cadastro-vazio">
+              <div class="empty__icon"><i class="ph ph-truck"></i></div>
+              <p class="empty__title">Nenhum veículo encontrado</p>
+              <p class="empty__text">Ajuste a busca ou cadastre um novo veículo/carreta.</p>
+            </div>
+            <div class="pagination hidden" id="cadastro-paginacao">
+              <button type="button" class="icon-btn icon-btn--bordered" data-action="cadastro-pagina" data-delta="-1" aria-label="Página anterior"><i class="ph ph-caret-left"></i></button>
+              <span id="cadastro-pagina-info"></span>
+              <button type="button" class="icon-btn icon-btn--bordered" data-action="cadastro-pagina" data-delta="1" aria-label="Próxima página"><i class="ph ph-caret-right"></i></button>
+            </div>
+          </div>
+
+          <div class="mtab-painel hidden" id="manut-painel-resumo" data-tab-painel="resumo">
+            <div class="filters" style="margin-bottom:16px">
+              <div class="input-icon filters__search">
+                <i class="ph ph-magnifying-glass"></i>
+                <input type="search" id="resumo-busca" class="input" placeholder="Buscar por placa, marca ou modelo...">
+              </div>
+            </div>
+            <div class="data-table-wrap">
+              <table class="data-table data-table--matrix">
+                <thead>
+                  <tr>
+                    <th>Placa</th><th>Revisão</th><th>5ª Roda</th><th>Integridade</th><th>SR - Tanques</th><th>No Pátio</th>
+                  </tr>
+                </thead>
+                <tbody id="resumo-tabela-corpo"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="mtab-painel hidden" id="manut-painel-agendar" data-tab-painel="agendar">
+            <div class="filters" style="margin-bottom:16px">
+              <div class="input-icon filters__search">
+                <i class="ph ph-magnifying-glass"></i>
+                <input type="search" id="demanda-busca" class="input" placeholder="Buscar por placa ou demanda...">
+              </div>
+              <button type="button" class="btn btn--primary" data-action="nova-demanda">
+                <i class="ph ph-plus"></i> Agendar Demanda
+              </button>
+            </div>
+
+            <div class="data-table-wrap" id="demanda-tabela-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr><th>Veículo</th><th>Demanda</th><th>Responsável</th><th>Início</th><th>Fim previsto</th><th>Status</th></tr>
+                </thead>
+                <tbody id="demanda-tabela-corpo"></tbody>
+              </table>
+            </div>
+            <div class="card empty hidden" id="demanda-vazio">
+              <div class="empty__icon"><i class="ph ph-calendar-plus"></i></div>
+              <p class="empty__title">Nenhuma demanda agendada</p>
+              <p class="empty__text">Clique em "Agendar Demanda" para programar a próxima manutenção de um veículo - ela aparece aqui, no Kanban, no Calendário e no Prontuário dele.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ============================ MODAIS ============================ -->
+<div id="modal-backdrop" class="backdrop hidden" data-action="close-topmost"></div>
+
+<!-- Criar conta -->
+<div id="modal-cadastro" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-cadastro">
+  <div class="modal__card modal__card--narrow">
+    <div class="modal__head">
+      <div class="modal__heading">
+        <div class="modal__mark"><i class="ph ph-user-plus"></i></div>
+        <div>
+          <h3 class="modal__title" id="titulo-cadastro">Criar conta</h3>
+          <p class="modal__sub">Cadastre-se para acessar o sistema</p>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="close-modal" data-modal="modal-cadastro" aria-label="Fechar"><i class="ph ph-x"></i></button>
+    </div>
+    <form id="form-cadastro" novalidate>
+      <div class="modal__body">
+        <div class="field">
+          <label class="field__label" for="cad-nome">Nome completo</label>
+          <input type="text" id="cad-nome" class="input" placeholder="Ex.: Matheus Andrade" required>
+        </div>
+        <div class="field">
+          <label class="field__label" for="cad-email">E-mail corporativo</label>
+          <input type="email" id="cad-email" class="input" placeholder="nome@redehg.com" required>
+        </div>
+        <div class="field">
+          <label class="field__label" for="cad-senha">Senha</label>
+          <input type="password" id="cad-senha" class="input" placeholder="Mínimo de 4 caracteres" required>
+        </div>
+        <div class="field">
+          <label class="field__label" for="cad-setor">Setor</label>
+          <select id="cad-setor" class="select"></select>
+          <p class="field__hint">Você só verá e criará demandas dentro do seu setor.</p>
+        </div>
+        <div class="field">
+          <span class="field__label">Setor não está na lista?</span>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="cad-setor-novo" class="input" placeholder="Nome do novo setor">
+            <button type="button" class="btn btn--secondary btn--sm" data-action="add-setor-cadastro"><i class="ph ph-plus"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="modal__foot">
+        <button type="button" class="btn btn--secondary" data-action="close-modal" data-modal="modal-cadastro">Cancelar</button>
+        <button type="submit" class="btn btn--primary">Criar conta</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Pasta -->
+<div id="modal-pasta" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-pasta">
+  <div class="modal__card modal__card--narrow">
+    <div class="modal__head">
+      <div class="modal__heading">
+        <div class="modal__mark"><i class="ph ph-folder-notch"></i></div>
+        <div>
+          <h3 class="modal__title" id="titulo-pasta">Nova pasta</h3>
+          <p class="modal__sub">Agrupa projetos de uma área</p>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="close-modal" data-modal="modal-pasta" aria-label="Fechar"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal__body">
+      <input type="hidden" id="pasta-id">
+      <div class="field">
+        <label class="field__label" for="pasta-nome">Nome da pasta</label>
+        <input type="text" id="pasta-nome" class="input" placeholder="Ex.: Setor Operacional">
+      </div>
+      <div class="field">
+        <span class="field__label">Cor de identificação</span>
+        <div class="swatches" id="pasta-cores"></div>
+        <input type="hidden" id="pasta-cor" value="#0D3B8C">
+      </div>
+      <div class="field hidden" id="campo-pasta-setor">
+        <label class="field__label" for="pasta-setor">Setor</label>
+        <select id="pasta-setor" class="select"></select>
+        <p class="field__hint">Só quem for deste setor (ou a Conta Mestre) vai ver esta pasta.</p>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn btn--secondary" data-action="close-modal" data-modal="modal-pasta">Cancelar</button>
+      <button class="btn btn--primary" data-action="save-folder">Salvar pasta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Projeto -->
+<div id="modal-projeto" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-projeto">
+  <div class="modal__card modal__card--narrow">
+    <div class="modal__head">
+      <div class="modal__heading">
+        <div class="modal__mark"><i class="ph ph-stack"></i></div>
+        <div>
+          <h3 class="modal__title" id="titulo-projeto">Novo projeto</h3>
+          <p class="modal__sub">Um conjunto de tarefas relacionadas</p>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="close-modal" data-modal="modal-projeto" aria-label="Fechar"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal__body">
+      <input type="hidden" id="projeto-id">
+      <input type="hidden" id="projeto-pasta-id">
+      <div class="field">
+        <label class="field__label" for="projeto-nome">Nome do projeto</label>
+        <input type="text" id="projeto-nome" class="input" placeholder="Ex.: Manutenção da frota">
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn btn--secondary" data-action="close-modal" data-modal="modal-projeto">Cancelar</button>
+      <button class="btn btn--primary" data-action="save-project">Salvar projeto</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tarefa -->
+<div id="modal-tarefa" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-tarefa">
+  <div class="modal__card modal__card--wide">
+    <div class="modal__head">
+      <div class="modal__heading">
+        <div class="modal__mark"><i class="ph ph-list-checks"></i></div>
+        <div>
+          <h3 class="modal__title" id="titulo-tarefa">Nova demanda</h3>
+          <p class="modal__sub" id="subtitulo-tarefa">Descreva o que precisa ser feito</p>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="close-modal" data-modal="modal-tarefa" aria-label="Fechar"><i class="ph ph-x"></i></button>
+    </div>
+
+    <div class="modal__body">
+      <input type="hidden" id="tarefa-id">
+      <input type="hidden" id="tarefa-projeto-id">
+      <input type="hidden" id="tarefa-dependencias" value="[]">
+
+      <div class="field">
+        <label class="field__label" for="tarefa-titulo">Título da demanda</label>
+        <input type="text" id="tarefa-titulo" class="input" placeholder="O que precisa ser feito?">
+      </div>
+
+      <div class="field hidden" id="tarefa-veiculo-grupo">
+        <label class="field__label" for="tarefa-veiculo-placa">Veículo</label>
+        <div class="input-icon">
+          <i class="ph ph-truck"></i>
+          <input type="text" id="tarefa-veiculo-placa" class="input" placeholder="Digite a placa..." autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="tarefa-veiculo-placa-sugestoes">
+          <div class="autocomplete-lista hidden" id="tarefa-veiculo-placa-sugestoes" role="listbox"></div>
+        </div>
+        <p class="field__hint"><i class="ph ph-info"></i> Esta demanda vai aparecer no Prontuário deste veículo, em Frota &amp; Manutenção.</p>
+      </div>
+
+      <div class="grid-2">
+        <div class="field">
+          <label class="field__label" for="tarefa-responsavel">Responsável</label>
+          <select id="tarefa-responsavel" class="select"></select>
+        </div>
+        <div class="field">
+          <label class="field__label" for="tarefa-cidade">Cidade</label>
+          <input type="text" id="tarefa-cidade" class="input" placeholder="Digite ou escolha" list="lista-cidades" autocomplete="off">
+          <datalist id="lista-cidades"></datalist>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="field">
+          <label class="field__label" for="tarefa-status">Status</label>
+          <select id="tarefa-status" class="select">
+            <option value="Pendente">Pendente</option>
+            <option value="Em Andamento">Em andamento</option>
+            <option value="Concluída">Concluída</option>
+            <option value="Cancelada">Cancelada</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label" for="tarefa-prioridade">Prioridade</label>
+          <select id="tarefa-prioridade" class="select">
+            <option value="Alta">Alta</option>
+            <option value="Média" selected>Média</option>
+            <option value="Baixa">Baixa</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fieldset">
+        <p class="fieldset__legend"><i class="ph ph-calendar-blank"></i> Datas planejadas</p>
+        <div class="grid-2">
+          <div class="field">
+            <label class="field__label" for="tarefa-previsao">Previsão</label>
+            <input type="date" id="tarefa-previsao" class="input">
+          </div>
+          <div class="field">
+            <label class="field__label" for="tarefa-vencimento">Vencimento</label>
+            <input type="date" id="tarefa-vencimento" class="input">
+          </div>
+        </div>
+      </div>
+
+      <div class="fieldset">
+        <p class="fieldset__legend"><i class="ph ph-clock-countdown"></i> Execução real</p>
+        <p class="field__hint">O status muda sozinho quando essas datas chegam: "Em andamento" ao passar do início, "Concluída" ao passar do fim.</p>
+        <div class="grid-3">
+          <div class="field">
+            <label class="field__label" for="tarefa-inicio-real">Início real</label>
+            <input type="date" id="tarefa-inicio-real" class="input">
+          </div>
+          <div class="field">
+            <label class="field__label" for="tarefa-fim-real">Fim real</label>
+            <input type="date" id="tarefa-fim-real" class="input">
+          </div>
+          <div class="field">
+            <label class="field__label" for="tarefa-conclusao">Conclusão</label>
+            <input type="date" id="tarefa-conclusao" class="input">
+            <p class="field__hint">Preenchida sozinha ao concluir; edite se precisar corrigir a data.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="fieldset">
+        <p class="fieldset__legend"><i class="ph ph-tag"></i> Etiqueta</p>
+        <div class="chips" id="tarefa-etiquetas-salvas" style="margin-bottom:10px"></div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <label style="position:relative;width:38px;height:38px;flex-shrink:0;cursor:pointer">
+            <input type="color" id="tarefa-etiqueta-cor" value="#F5B800" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer">
+            <span id="tarefa-etiqueta-preview" style="display:block;width:100%;height:100%;border-radius:var(--r-md);background:#F5B800;border:1px solid rgba(0,0,0,.1)"></span>
+          </label>
+          <input type="text" id="tarefa-etiqueta-nome" class="input" placeholder="Ex.: Urgente, Preventiva, Frota">
+          <button type="button" class="icon-btn" data-action="save-etiqueta" aria-label="Salvar etiqueta para reutilizar depois" title="Salvar para reutilizar depois">
+            <i class="ph ph-bookmark-simple"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="tarefa-descricao">Detalhes</label>
+        <textarea id="tarefa-descricao" class="textarea" placeholder="Contexto, passos, links úteis..."></textarea>
+      </div>
+
+      <div id="tarefa-avancado" class="hidden" style="display:flex;flex-direction:column;gap:16px">
+        <div class="fieldset">
+          <p class="fieldset__legend"><i class="ph ph-link-simple"></i> Depende de outras tarefas</p>
+          <p class="field__hint">A demanda fica bloqueada até que as dependências sejam concluídas.</p>
+          <div class="input-icon" style="margin-bottom:8px">
+            <i class="ph ph-magnifying-glass"></i>
+            <input type="search" id="tarefa-dependencias-busca" class="input" placeholder="Buscar demanda para vincular...">
+          </div>
+          <div class="chips" id="tarefa-dependencias-lista"></div>
+        </div>
+
+        <div>
+          <div class="tabs">
+            <button class="tab is-active" data-action="tab" data-tab="anexos"><i class="ph ph-paperclip"></i> Anexos <span class="tab__count hidden" id="conta-anexos"></span></button>
+            <button class="tab" data-action="tab" data-tab="comentarios"><i class="ph ph-chat-circle-dots"></i> Comentários <span class="tab__count hidden" id="conta-comentarios"></span></button>
+            <button class="tab" data-action="tab" data-tab="historico"><i class="ph ph-clock-counter-clockwise"></i> Histórico</button>
+          </div>
+
+          <div style="padding-top:12px">
+            <div class="tab-panel" id="painel-anexos">
+              <div class="stack" id="lista-anexos"></div>
+              <label class="dropzone">
+                <i class="ph ph-cloud-arrow-up"></i>
+                <span>Clique para anexar um arquivo</span>
+                <input type="file" id="tarefa-anexo" class="sr-only" data-action="upload-anexo">
+              </label>
+            </div>
+
+            <div class="tab-panel hidden" id="painel-comentarios">
+              <div class="stack" id="lista-comentarios"></div>
+              <div style="display:flex;gap:8px">
+                <input type="text" id="novo-comentario" class="input" placeholder="Escreva um comentário...">
+                <button class="btn btn--primary" data-action="add-comment" aria-label="Enviar comentário"><i class="ph ph-paper-plane-tilt"></i></button>
+              </div>
+            </div>
+
+            <div class="tab-panel hidden" id="painel-historico">
+              <div class="stack" id="lista-historico"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal__foot modal__foot--split">
+      <div style="display:flex;align-items:center;gap:6px">
+        <button class="icon-btn icon-btn--danger hidden" id="tarefa-excluir-btn" data-action="delete-task" data-id="" aria-label="Excluir demanda" title="Excluir demanda">
+          <i class="ph ph-trash"></i>
+        </button>
+        <button class="btn btn--ghost btn--sm" data-action="toggle-advanced">
+          <i class="ph ph-caret-down" id="icone-avancado"></i>
+          <span id="rotulo-avancado">Mais opções</span>
+        </button>
+      </div>
+      <div style="display:flex;gap:9px">
+        <button class="btn btn--secondary" data-action="close-modal" data-modal="modal-tarefa">Cancelar</button>
+        <button class="btn btn--primary" data-action="save-task"><i class="ph ph-check"></i> Salvar demanda</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Gerenciar usuários (Conta Mestre) -->
+<div id="modal-usuarios" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-usuarios">
+  <div class="modal__card">
+    <div class="modal__head">
+      <div class="modal__heading">
+        <div class="modal__mark"><i class="ph ph-users-three"></i></div>
+        <div>
+          <h3 class="modal__title" id="titulo-usuarios">Gerenciar usuários</h3>
+          <p class="modal__sub">Setor e acesso de Conta Mestre de cada pessoa</p>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="close-modal" data-modal="modal-usuarios" aria-label="Fechar"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal__body">
+      <p class="field__hint" style="margin-bottom:12px">Conta Mestre vê e gerencia todos os setores; mudar o setor de alguém aqui muda o que essa pessoa enxerga imediatamente.</p>
+      <div id="admin-usuarios-aviso"></div>
+      <div class="admin-users-list" id="admin-usuarios-lista"></div>
+      <p class="field__hint admin-users-rodape"><i class="ph ph-folder-simple-lock"></i> Estes acessos ficam gravados no arquivo <strong>permissoes_contas.json</strong>, na mesma pasta compartilhada dos dados do sistema, e valem para todos os computadores. Computadores com uma versão antiga do programa não respeitam setor nem Mestre — atualize-os.</p>
+    </div>
+    <div class="modal__foot">
+      <button class="btn btn--secondary" data-action="close-modal" data-modal="modal-usuarios">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Editar nome -->
+<div id="modal-nome" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-nome">
+  <div class="modal__card modal__card--narrow">
+    <div class="modal__head">
+      <div class="modal__heading">
+        <div class="modal__mark"><i class="ph ph-user-circle"></i></div>
+        <div>
+          <h3 class="modal__title" id="titulo-nome">Alterar nome</h3>
+          <p class="modal__sub">Como você aparece para a equipe</p>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="close-modal" data-modal="modal-nome" aria-label="Fechar"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal__body">
+      <div class="field">
+        <label class="field__label" for="input-nome-exibicao">Nome de exibição</label>
+        <input type="text" id="input-nome-exibicao" class="input" placeholder="Seu nome">
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn btn--secondary" data-action="close-modal" data-modal="modal-nome">Cancelar</button>
+      <button class="btn btn--primary" data-action="save-name">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detalhes do dia -->
+<div id="modal-dia" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-dia">
+  <div class="modal__card modal__card--wide">
+    <div class="modal__head">
+      <div class="modal__heading">
+        <div class="modal__mark"><i class="ph ph-calendar-dots"></i></div>
+        <div>
+          <h3 class="modal__title" id="titulo-dia">—</h3>
+          <p class="modal__sub" id="subtitulo-dia">—</p>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="close-modal" data-modal="modal-dia" aria-label="Fechar"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal__body" id="corpo-dia"></div>
+    <div class="modal__foot">
+      <button class="btn btn--secondary" data-action="close-modal" data-modal="modal-dia">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Prontuário do Veículo (Frota & Manutenção) -->
+<div id="modal-prontuario" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-prontuario">
+  <div class="modal__card modal__card--wide">
+    <div class="modal__head">
+      <div class="modal__heading">
+        <div class="modal__mark"><i class="ph ph-file-text"></i></div>
+        <div>
+          <h3 class="modal__title" id="titulo-prontuario">Prontuário do Veículo</h3>
+          <p class="modal__sub">Todas as categorias de manutenção desta placa, cruzadas por Placa</p>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="close-modal" data-modal="modal-prontuario" aria-label="Fechar"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal__body" id="corpo-prontuario"></div>
+    <div class="modal__foot">
+      <button class="btn btn--secondary" data-action="close-modal" data-modal="modal-prontuario">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sincronização / Importar Base (Frota & Manutenção) -->
+<div id="modal-atualizacoes" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-atualizacoes">
+  <div class="modal__card modal__card--narrow">
+    <div class="modal__head">
+      <div class="modal__heading">
+        <div class="modal__mark"><i class="ph ph-arrows-clockwise"></i></div>
+        <div>
+          <h3 class="modal__title" id="titulo-atualizacoes">Atualizações</h3>
+          <p class="modal__sub" id="atualizacao-versao">Versão instalada</p>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="close-modal" data-modal="modal-atualizacoes" aria-label="Fechar"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal__body">
+      <div class="atualizacao" id="atualizacao-corpo" aria-live="polite"></div>
+    </div>
+    <div class="modal__foot" id="atualizacao-acoes"></div>
+  </div>
+</div>
+
+<div id="modal-importar" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-importar">
+  <div class="modal__card modal__card--narrow">
+    <div class="modal__head">
+      <div class="modal__heading">
+        <div class="modal__mark"><i class="ph ph-cloud-arrow-up"></i></div>
+        <div>
+          <h3 class="modal__title" id="titulo-importar">Sincronização / Importar Base</h3>
+          <p class="modal__sub">Substitui a planilha inteira no Google Drive por um arquivo .xlsx novo</p>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="close-modal" data-modal="modal-importar" aria-label="Fechar"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal__body">
+      <label class="dropzone dropzone--grande" id="manut-dropzone">
+        <i class="ph ph-file-xls"></i>
+        <p class="dropzone__title">Arraste o arquivo .xlsx aqui</p>
+        <p class="dropzone__hint">ou clique para escolher · limite de 30&nbsp;MB</p>
+        <input type="file" id="manut-dropzone-input" class="sr-only" accept=".xlsx" data-action="importar-manutencao">
+      </label>
+      <div class="dropzone__progresso hidden" id="manut-dropzone-progresso">
+        <div class="dropzone__progresso-head">
+          <span id="manut-dropzone-nome">arquivo.xlsx</span>
+          <span id="manut-dropzone-percentual">Enviando…</span>
+        </div>
+        <div class="progress"><div class="progress__fill" id="manut-dropzone-fill" style="width:0%"></div></div>
+      </div>
+      <p class="field__hint"><i class="ph ph-shield-check"></i> O Google Drive mantém o histórico de versões do arquivo anterior — dá para restaurar pelo próprio Drive se algo sair errado.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Novo Veículo/Carreta (Cadastro de Frota) -->
+<div id="modal-novo-veiculo" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-novo-veiculo">
+  <div class="modal__card modal__card--wide">
+    <div class="modal__head">
+      <div class="modal__heading">
+        <div class="modal__mark"><i class="ph ph-truck"></i></div>
+        <div>
+          <h3 class="modal__title" id="titulo-novo-veiculo">Novo Veículo/Carreta</h3>
+          <p class="modal__sub">Cadastra direto na planilha, sem deslocar nenhum veículo já existente</p>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="close-modal" data-modal="modal-novo-veiculo" aria-label="Fechar"><i class="ph ph-x"></i></button>
+    </div>
+    <form id="form-novo-veiculo" novalidate>
+      <div class="modal__body">
+        <div class="segmented">
+          <button type="button" class="segmented__opt is-active" data-action="tipo-cadastro" data-tipo="cavalo">
+            <i class="ph ph-truck"></i> Cavalo
+          </button>
+          <button type="button" class="segmented__opt" data-action="tipo-cadastro" data-tipo="carreta">
+            <i class="ph ph-truck-trailer"></i> Carreta
+          </button>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="nv-placa">Placa</label>
+          <input type="text" id="nv-placa" class="input" placeholder="Ex.: ABC1D23" maxlength="8" style="text-transform:uppercase">
+        </div>
+
+        <div id="nv-campos-cavalo">
+          <div class="grid-2">
+            <div class="field">
+              <label class="field__label" for="nv-cod">Código</label>
+              <input type="text" id="nv-cod" class="input" placeholder="Ex.: 59">
+            </div>
+            <div class="field">
+              <label class="field__label" for="nv-centro-custo">Centro de custo</label>
+              <input type="text" id="nv-centro-custo" class="input" placeholder="Ex.: TRR">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field__label" for="nv-marca">Marca</label>
+              <input type="text" id="nv-marca" class="input" placeholder="Ex.: Volvo">
+            </div>
+            <div class="field">
+              <label class="field__label" for="nv-modelo">Modelo</label>
+              <input type="text" id="nv-modelo" class="input" placeholder="Ex.: FH 540">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field__label" for="nv-ano-fab">Ano de fabricação</label>
+              <input type="number" id="nv-ano-fab" class="input" placeholder="Ex.: 2024">
+            </div>
+            <div class="field">
+              <label class="field__label" for="nv-ano-mod">Ano do modelo</label>
+              <input type="number" id="nv-ano-mod" class="input" placeholder="Ex.: 2024">
+            </div>
+          </div>
+        </div>
+
+        <div id="nv-campos-carreta" class="hidden">
+          <div class="grid-2">
+            <div class="field">
+              <label class="field__label" for="nv-marca-carreta">Marca</label>
+              <input type="text" id="nv-marca-carreta" class="input" placeholder="Ex.: Randon">
+            </div>
+            <div class="field">
+              <label class="field__label" for="nv-modelo-carreta">Modelo</label>
+              <input type="text" id="nv-modelo-carreta" class="input" placeholder="Ex.: TQ PP BTD3E">
+            </div>
+          </div>
+          <div class="grid-3">
+            <div class="field">
+              <label class="field__label" for="nv-ano-fab-carreta">Ano fab.</label>
+              <input type="number" id="nv-ano-fab-carreta" class="input" placeholder="2024">
+            </div>
+            <div class="field">
+              <label class="field__label" for="nv-ano-mod-carreta">Ano mod.</label>
+              <input type="number" id="nv-ano-mod-carreta" class="input" placeholder="2024">
+            </div>
+            <div class="field">
+              <label class="field__label" for="nv-uf">UF</label>
+              <input type="text" id="nv-uf" class="input" placeholder="Ex.: MG" maxlength="2" style="text-transform:uppercase">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field__label" for="nv-renavam">Renavam</label>
+              <input type="text" id="nv-renavam" class="input" placeholder="Número do Renavam">
+            </div>
+            <div class="field">
+              <label class="field__label" for="nv-chassi">Chassi</label>
+              <input type="text" id="nv-chassi" class="input" placeholder="Número do chassi">
+            </div>
+          </div>
+          <div class="grid-3">
+            <div class="field">
+              <label class="field__label" for="nv-eixos">Eixos</label>
+              <input type="number" id="nv-eixos" class="input" placeholder="Ex.: 3">
+            </div>
+            <div class="field">
+              <label class="field__label" for="nv-capacidade">Capacidade (kg)</label>
+              <input type="number" id="nv-capacidade" class="input" placeholder="Ex.: 7500">
+            </div>
+            <div class="field">
+              <label class="field__label" for="nv-implemento">Implemento</label>
+              <input type="text" id="nv-implemento" class="input" placeholder="Ex.: Rodotrem">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal__foot">
+        <button type="button" class="btn btn--secondary" data-action="close-modal" data-modal="modal-novo-veiculo">Cancelar</button>
+        <button type="button" class="btn btn--primary" data-action="salvar-novo-veiculo"><i class="ph ph-check"></i> Cadastrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Conflito de edição (Frota & Manutenção): outra pessoa alterou a mesma célula -->
+<div id="modal-conflito-manutencao" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-conflito-manut">
+  <div class="modal__card">
+    <div class="modal__head">
+      <div class="modal__heading">
+        <div class="modal__mark modal__mark--warning"><i class="ph ph-warning"></i></div>
+        <div>
+          <h3 class="modal__title" id="titulo-conflito-manut">Alguém alterou este campo</h3>
+          <p class="modal__sub" id="conflito-manut-campo">—</p>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="close-modal" data-modal="modal-conflito-manutencao" aria-label="Fechar"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal__body">
+      <p class="field__hint">Outra pessoa (ou outro sistema) já salvou um valor diferente para este campo enquanto você editava. Escolha como continuar:</p>
+      <div class="grid-2">
+        <div class="card">
+          <p class="field__label">Você tentou salvar</p>
+          <p class="mhero-kpi__value" style="font-size:20px" id="conflito-manut-valor-novo">—</p>
+        </div>
+        <div class="card">
+          <p class="field__label">Valor mais recente na planilha</p>
+          <p class="mhero-kpi__value" style="font-size:20px" id="conflito-manut-valor-atual">—</p>
+        </div>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button type="button" class="btn btn--secondary" data-action="usar-valor-atual-conflito"><i class="ph ph-arrow-clockwise"></i> Usar valor mais recente</button>
+      <button type="button" class="btn btn--primary" data-action="sobrescrever-conflito-manutencao"><i class="ph ph-check"></i> Salvar meu valor mesmo assim</button>
+    </div>
+  </div>
+</div>
+
+<!-- Recuperação de senha -->
+<div id="modal-recuperacao" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-recuperacao">
+  <div class="modal__card modal__card--narrow">
+    <div class="modal__head">
+      <div class="modal__heading">
+        <div class="modal__mark"><i class="ph ph-key"></i></div>
+        <div>
+          <h3 class="modal__title" id="titulo-recuperacao">Recuperar senha</h3>
+          <p class="modal__sub" id="subtitulo-recuperacao">Informe seu e-mail cadastrado</p>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="close-modal" data-modal="modal-recuperacao" aria-label="Fechar"><i class="ph ph-x"></i></button>
+    </div>
+
+    <div class="modal__body">
+      <!-- Etapa 1 -->
+      <div id="rec-etapa-1" style="display:flex;flex-direction:column;gap:16px">
+        <div class="field">
+          <label class="field__label" for="rec-email">E-mail cadastrado</label>
+          <div class="input-icon">
+            <i class="ph ph-envelope-simple"></i>
+            <input type="email" id="rec-email" class="input" placeholder="nome@redehg.com">
+          </div>
+        </div>
+        <button class="btn btn--primary btn--block" data-action="rec-request">
+          <i class="ph ph-paper-plane-tilt"></i> Enviar código
+        </button>
+      </div>
+
+      <!-- Etapa 2 -->
+      <div id="rec-etapa-2" class="hidden" style="display:flex;flex-direction:column;gap:16px">
+        <div class="badge badge--green" style="height:auto;padding:9px 11px;white-space:normal;line-height:1.45">
+          <i class="ph-fill ph-check-circle"></i> Se o e-mail estiver cadastrado, o código chegará em instantes.
+        </div>
+        <div class="field">
+          <label class="field__label" for="rec-codigo">Código de 6 dígitos</label>
+          <input type="text" id="rec-codigo" class="input num" inputmode="numeric" maxlength="6" placeholder="000000"
+                 style="text-align:center;font-size:22px;font-weight:600;letter-spacing:.4em;height:52px">
+        </div>
+        <div style="display:flex;gap:9px">
+          <button class="btn btn--secondary" style="flex:1" data-action="rec-back" data-step="1"><i class="ph ph-arrow-left"></i> Voltar</button>
+          <button class="btn btn--primary" style="flex:1" data-action="rec-validate">Validar <i class="ph ph-check"></i></button>
+        </div>
+        <button class="link-btn" data-action="rec-request" style="text-align:center">Não recebeu? Reenviar código</button>
+      </div>
+
+      <!-- Etapa 3 -->
+      <div id="rec-etapa-3" class="hidden" style="display:flex;flex-direction:column;gap:16px">
+        <div class="field">
+          <label class="field__label" for="rec-senha">Nova senha</label>
+          <div class="input-icon">
+            <i class="ph ph-lock-key"></i>
+            <input type="password" id="rec-senha" class="input" placeholder="Mínimo de 4 caracteres">
+            <button type="button" class="input-icon__action" data-action="toggle-password" data-target="rec-senha" aria-label="Mostrar senha">
+              <i class="ph ph-eye"></i>
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field__label" for="rec-senha-confirma">Confirmar nova senha</label>
+          <div class="input-icon">
+            <i class="ph ph-lock-key"></i>
+            <input type="password" id="rec-senha-confirma" class="input" placeholder="Repita a senha">
+          </div>
+        </div>
+        <div style="display:flex;gap:9px">
+          <button class="btn btn--secondary" style="flex:1" data-action="rec-back" data-step="2"><i class="ph ph-arrow-left"></i> Voltar</button>
+          <button class="btn btn--primary" style="flex:1" data-action="rec-reset"><i class="ph ph-floppy-disk"></i> Salvar senha</button>
+        </div>
+      </div>
+
+      <!-- Etapa 4 -->
+      <div id="rec-etapa-4" class="hidden" style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:12px 0">
+        <div class="empty__icon" style="background:var(--green-soft);color:var(--green);width:52px;height:52px;font-size:26px">
+          <i class="ph-fill ph-check-circle"></i>
+        </div>
+        <h4 style="font-size:16px">Senha redefinida</h4>
+        <p class="empty__text">Sua senha foi alterada com sucesso. Já pode entrar com ela.</p>
+        <button class="btn btn--primary btn--block" style="margin-top:14px" data-action="close-modal" data-modal="modal-recuperacao">
+          Voltar para o login <i class="ph ph-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
+<div class="toast-atualizacao hidden" id="aviso-atualizacao" role="status">
+  <div class="toast-atualizacao__texto">
+    <strong>Uma nova versão está disponível!</strong>
+    <span id="aviso-atualizacao-versoes"></span>
+  </div>
+  <div class="toast-atualizacao__acoes">
+    <button type="button" class="btn btn--primary btn--sm" data-action="abrir-atualizacoes">Ver e atualizar</button>
+    <button type="button" class="btn btn--secondary btn--sm" data-action="atualizacao-lembrar">Lembrar mais tarde</button>
+  </div>
+</div>
+</body>
+</html>
