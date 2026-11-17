@@ -35,27 +35,27 @@ descartável. Onde algo não foi verificado, está dito.
 | App falhava se a pasta de dados não existia (instalação nova) | cria a pasta | `test_admin_inicial_...` |
 | Cadastro e busca de placa vazios por célula vazia (`NaN` no JSON) — corrigido antes desta missão | — | `testar_celulas_vazias.py` |
 
-## Falhas altas — **pendentes** (não corrigidas)
+## Falhas altas — situação na 1.1.0
 
-1. **Cadastro aberto com setor autodeclarado**: qualquer pessoa cria conta no setor "Manutenção" e vê o módulo. Exige
-   decisão de produto (aprovação pela Conta Mestre) — não mudei para não quebrar o onboarding.
-2. **Tokens de sessão e códigos de recuperação em texto puro** no JSON da pasta compartilhada.
-3. **Atualização perdida entre PCs** em `recarregar()` e no construtor (gravam antes da trava) e **trava de arquivo sem
-   dono** (considerada órfã após 30 s).
-4. **Campos desconhecidos descartados ao regravar** e **sem versão do formato** dos dados.
-5. **Queda silenciosa para uma base local vazia** quando a unidade de rede não está montada (o app abre "vazio").
-6. **Manutenção**: escrita no `.xlsx` sem trava (lê-altera-reenvia o arquivo inteiro), reescrita de namespaces no XML,
-   e valores de fórmula que "voltam" ao valor antigo após editar.
-7. **Frontend**: dados compartilhados nunca são recarregados sozinhos (cada PC trabalha com estado envelhecido) e o
-   editor regrava a demanda inteira a partir da cópia antiga.
-8. Médias/baixas: injeção de fórmula no Excel exportado, entradas de tipo errado gerando 500, bloqueio por dependência
-   contornável na edição, desempenho (o JSON inteiro é relido a cada requisição).
+| # | Falha | Situação |
+|---|---|---|
+| 1 | Cadastro aberto com setor autodeclarado | **corrigida**: setor que já tem pasta só é liberado pela Conta Mestre (conta nasce sem acesso e aparece "Aguardando liberação" em Gerenciar usuários) |
+| 2 | Tokens de sessão e códigos de recuperação em texto puro no JSON | **corrigida**: só o hash vai para o arquivo compartilhado (`sessoes.json`) |
+| 3 | Atualização perdida entre PCs (gravar antes da trava) e trava sem dono | **corrigida**: toda gravação automática recarrega e regrava sob a trava; a trava tem dono e só ele a remove (quebra após 90 s) |
+| 4 | Campos desconhecidos descartados e sem versão do formato | **parcial**: campos desconhecidos das **contas** são preservados e todo arquivo tem `_formato` (versão mais nova é recusada). Tarefas ainda descartam campos desconhecidos |
+| 5 | Queda silenciosa para base local vazia sem a unidade de rede | **corrigida**: o app mostra o motivo e não grava (opt-in explícito para uso local) |
+| 6 | Manutenção: escrita no `.xlsx` sem trava / namespaces / fórmulas | **pendente** |
+| 7 | Frontend: dados compartilhados sem recarga automática; editor regrava a demanda inteira | **pendente** |
+| 8 | Médias/baixas (injeção de fórmula no Excel, 500 por tipo errado, dependência contornável, desempenho) | **pendentes** |
+
+> Limitação conhecida do armazenamento novo: **"Voltar à versão anterior"** devolve o app ao armazenamento antigo
+> (1.0.x), que não enxerga o que foi criado depois da migração. Os dados novos continuam intactos em `HGhub-dados`.
 
 ## Matriz de testes (o que foi **efetivamente executado**)
 
 | Teste | Resultado |
 |---|---|
-| `pytest tests` — atualizador (53) + segurança/dados (29) | **APROVADO 82/82** |
+| `pytest tests` — atualizador (53) + segurança/dados (29) + armazenamento/migração (17) | **APROVADO 99/99** |
 | Teste de mutação do atualizador (12 defesas quebradas de propósito) | **APROVADO** — todas detectadas |
 | **E2E com instaladores reais** (`tests/e2e_instalado.py`): instalar, abrir, login, dados, atualizar 1.0.0→1.0.1, dados intactos, voltar à anterior, sem internet, assinatura falsa, pacote adulterado, desinstalar | **APROVADO 33/33** |
 | Navegador — `verificar_manutencao.js` (dashboard, análises, cadastro/Gerenciar, contas) | **APROVADO 108/108** |

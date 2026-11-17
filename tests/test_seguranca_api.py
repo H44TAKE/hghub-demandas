@@ -47,7 +47,7 @@ def test_admin_inicial_nao_usa_a_senha_fixa_123456(tmp_path, monkeypatch):
     app = importlib.import_module("backend").create_app()
     c = app.test_client()
     assert c.post("/api/login", json={"email": "admin@redehg.com", "senha": "123456"}).status_code == 401
-    arq = tmp_path / "d" / "SENHA_INICIAL_ADMIN.txt"
+    arq = tmp_path / "d" / "HGhub-dados" / "SENHA_INICIAL_ADMIN.txt"
     assert arq.exists()
     senha = [l for l in arq.read_text(encoding="utf-8").splitlines() if l.startswith("Senha: ")][0][7:]
     assert len(senha) >= 12 and c.post("/api/login", json={"email": "admin@redehg.com", "senha": senha}).status_code == 200
@@ -156,10 +156,11 @@ def test_sessao_expira_depois_de_30_dias(ambiente):
     _, c, dados, _ = ambiente
     h = login(c)
     assert c.post("/api/sessao/validar", headers=h).status_code == 200
-    arq = dados / "dados_sistema_hg.json"
+    arq = dados / "HGhub-dados" / "sessoes.json"
     d = json.loads(arq.read_text(encoding="utf-8"))
-    token = h["Authorization"].split()[1]
-    d["sessoes"][token]["criada_em"] = "2020-01-01T00:00:00"
+    (chave,) = d["sessoes"]                                  # a chave e o HASH do token (nunca o token)
+    assert chave not in h["Authorization"]
+    d["sessoes"][chave]["criada_em"] = "2020-01-01T00:00:00"
     arq.write_text(json.dumps(d), encoding="utf-8")
     assert c.post("/api/sessao/validar", headers=h).status_code == 401
     assert c.get("/api/dados", headers=h).status_code == 401
@@ -168,7 +169,7 @@ def test_sessao_expira_depois_de_30_dias(ambiente):
 def test_base_ilegivel_nunca_e_sobrescrita(ambiente):
     app, c, dados, _ = ambiente
     login(c)
-    arq = dados / "dados_sistema_hg.json"
+    arq = dados / "HGhub-dados" / "demandas.json"
     original = arq.read_text(encoding="utf-8")
     arq.write_text(original[: len(original) // 2], encoding="utf-8")       # arquivo truncado
     truncado = arq.read_bytes()
@@ -182,7 +183,7 @@ def test_base_ilegivel_nunca_e_sobrescrita(ambiente):
 def test_base_com_bom_e_lida(ambiente):
     app, c, dados, _ = ambiente
     login(c)
-    arq = dados / "dados_sistema_hg.json"
+    arq = dados / "HGhub-dados" / "demandas.json"
     arq.write_bytes(b"\xef\xbb\xbf" + arq.read_bytes())
     assert c.post("/api/login", json={"email": "admin@redehg.com", "senha": "SenhaDeTeste#1"}).status_code == 200
 
@@ -190,17 +191,17 @@ def test_base_com_bom_e_lida(ambiente):
 def test_falha_de_gravacao_nao_responde_sucesso(ambiente, monkeypatch):
     app, c, dados, _ = ambiente
     h = login(c)
-    antes = (dados / "dados_sistema_hg.json").read_bytes()
+    antes = (dados / "HGhub-dados" / "catalogos.json").read_bytes()
 
     def quebra(*a, **k):
         raise PermissionError("WinError 5")
-    monkeypatch.setattr("backend.models.os.replace", quebra)
-    monkeypatch.setattr("backend.models.time.sleep", lambda s: None)
+    monkeypatch.setattr("backend.armazenamento.os.replace", quebra)
+    monkeypatch.setattr("backend.armazenamento.time.sleep", lambda s: None)
     app.config["PROPAGATE_EXCEPTIONS"] = False
     r = c.post("/api/etiquetas", json={"nome": "Urgente"}, headers=h)
     assert r.status_code == 500 and r.get_json()["success"] is False       # antes: "sucesso" e a alteracao sumia
-    assert (dados / "dados_sistema_hg.json").read_bytes() == antes
-    assert not list(dados.glob("*.tmp"))
+    assert (dados / "HGhub-dados" / "catalogos.json").read_bytes() == antes
+    assert not list((dados / "HGhub-dados").glob("*.tmp"))
 
 
 def test_smtp_valida_certificado():

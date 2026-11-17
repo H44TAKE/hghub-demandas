@@ -43,6 +43,7 @@ chave = T.carregar_chave_privada(str(chave_pem))
 TMP = Path(tempfile.mkdtemp(prefix="hghub_e2e_"))
 APP_DIR = TMP / "app"
 DADOS = TMP / "dados" / "dados_sistema_hg.json"
+USUARIOS_JSON = TMP / "dados" / "HGhub-dados" / "usuarios.json"   # base atual (o dados_sistema_hg.json e so legado)
 LOCAL = Path(os.environ["LOCALAPPDATA"]) / "HGhub"
 ok = total = 0
 processo = None
@@ -222,7 +223,7 @@ def main():
         confere(api("POST", "/api/cadastro", {"nome": "Ana E2E", "email": "ana.e2e@x.com", "senha": "abcd1234", "setor": "Frota"})[0] == 200, "conta de usuario criada")
         e = esperar_fase(token, ("disponivel", "pronta"), 60)
         confere(e and e["versao_nova"] == v_nova, f"o app percebe sozinho a versao {v_nova} (verificacao em segundo plano)")
-        antes = DADOS.read_bytes()
+        antes = DADOS.read_bytes()      # a 1.0.0 grava no arquivo ANTIGO; a 1.1.0 vai importar e nunca mais grava nele
 
         print(f"[2] atualizar {v_antiga} -> {v_nova} pelo proprio app")
         st, _ = api("POST", "/api/atualizacao/baixar", token=token)
@@ -238,7 +239,8 @@ def main():
         confere(api("GET", "/api/etiquetas", token=token)[1].get("etiquetas") and any(
             x["nome"] == "E2E-Etiqueta" for x in api("GET", "/api/etiquetas", token=token)[1]["etiquetas"]), "etiqueta criada ANTES continua la")
         confere(api("POST", "/api/login", {"email": "ana.e2e@x.com", "senha": "abcd1234"})[0] == 200, "conta criada ANTES continua funcionando")
-        confere(b"ana.e2e@x.com" in DADOS.read_bytes() and len(DADOS.read_bytes()) >= len(antes) - 2000, "arquivo de dados preservado")
+        confere(b"ana.e2e@x.com" in USUARIOS_JSON.read_bytes(), "base antiga IMPORTADA para a pasta nova (HGhub-dados)")
+        confere(DADOS.read_bytes() == antes, "arquivo antigo continua byte a byte igual (somente leitura)")
         est = json.loads((LOCAL / "installers" / "estado.json").read_text(encoding="utf-8")) if (LOCAL / "installers" / "estado.json").exists() else {}
         confere(est.get("atual", {}).get("versao") == v_nova and est.get("anterior", {}).get("versao") == v_antiga,
                 f"instalador anterior ({v_antiga}) guardado para reversao")
@@ -287,7 +289,7 @@ def main():
         r = subprocess.run([str(APP_DIR / "unins000.exe"), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"], timeout=300)
         time.sleep(3)
         confere(r.returncode == 0 and not (APP_DIR / "HGhub.exe").exists(), "desinstalador removeu o programa")
-        confere(DADOS.exists() and b"ana.e2e@x.com" in DADOS.read_bytes(), "os DADOS do usuario continuam depois de desinstalar")
+        confere(USUARIOS_JSON.exists() and b"ana.e2e@x.com" in USUARIOS_JSON.read_bytes(), "os DADOS do usuario continuam depois de desinstalar")
     finally:
         mock.parar()
         encerrar_app()

@@ -97,9 +97,10 @@ def create_app():
     from .models import BaseIlegivelError
 
     @app.errorhandler(BaseIlegivelError)
-    def base_ilegivel(_erro):
-        return jsonify({"success": False, "message": "A base de dados não pôde ser lida agora (rede instável ou arquivo "
-                        "danificado). Nada foi alterado. Tente novamente; se persistir, avise o administrador."}), 503
+    def base_ilegivel(erro):
+        mensagem = str(erro) or ("A base de dados não pôde ser lida agora (rede instável ou arquivo danificado). "
+                                 "Nada foi alterado. Tente novamente; se persistir, avise o administrador.")
+        return jsonify({"success": False, "message": mensagem, "tipo": "base_indisponivel"}), 503
 
     @app.errorhandler(500)
     def erro_interno(erro):

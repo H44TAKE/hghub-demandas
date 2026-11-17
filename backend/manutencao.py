@@ -39,7 +39,7 @@ import zipfile
 from datetime import date, datetime, timedelta
 from xml.etree import ElementTree as ET
 
-from .utils import ARQUIVO_CREDENCIAIS_SHEETS, bloqueio_arquivo, caminho_arquivo_dados, carregar_config
+from .utils import ARQUIVO_CREDENCIAIS_SHEETS, ARQUIVO_OCULTOS, bloqueio_arquivo, carregar_config
 
 log = logging.getLogger("hghub")
 
@@ -1461,7 +1461,6 @@ def cadastrar_veiculo(tipo, dados, modificado_em_esperado=None):
 # lado dos demais arquivos do sistema), que versões antigas do programa não conhecem e
 # portanto não apagam. Reativar é só ligar de novo; nada se perde.
 # ==============================================================
-ARQUIVO_OCULTOS = caminho_arquivo_dados("veiculos_ocultos.json")
 _ocultos_cache = {}
 _aviso_ocultos_em = 0.0
 

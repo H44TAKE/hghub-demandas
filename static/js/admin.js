@@ -121,6 +121,7 @@ function linhaUsuario(usuario) {
         <div class="admin-user__info">
           <p class="admin-user__name">${escapar(nomeDoUsuario(usuario))}</p>
           <p class="admin-user__email">${escapar(usuario.email)}</p>
+          ${usuario.setor_solicitado ? `<p class="admin-user__email"><b>Aguardando liberação</b> — pediu o setor ${escapar(usuario.setor_solicitado)}</p>` : ''}
         </div>
         <label class="switch" title="Conta Mestre: acessa e gerencia tudo, de todos os setores">
           <input type="checkbox" data-action="admin-mestre" data-id="${escapar(usuario.id)}" ${usuario.conta_mestre ? 'checked' : ''}>

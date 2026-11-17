@@ -93,7 +93,27 @@ def _resolver_arquivo_dados():
     return candidatos[0]
 
 
-ARQUIVO_DADOS = _resolver_arquivo_dados()
+ARQUIVO_DADOS = _resolver_arquivo_dados()    # LEGADO: so leitura (ver backend/armazenamento.py)
+
+
+def _sem_rede_bloqueado():
+    """Instalado, sem a pasta de rede e sem base local explicitamente permitida: o app NAO deve abrir uma
+    base local vazia em silencio (todo mundo veria o sistema "sem dados" e novas demandas ficariam isoladas)."""
+    if not EMPACOTADO or os.environ.get("HGHUB_ARQUIVO_DADOS") or _arquivo_dados_na_rede():
+        return False
+    try:
+        with open(os.path.join(PASTA_LOCAL_APP, "config_local.json"), "r", encoding="utf-8-sig") as f:
+            if json.load(f).get("permitir_base_local") is True:
+                return False
+    except Exception:
+        pass
+    return True
+
+
+SEM_REDE_BLOQUEADO = _sem_rede_bloqueado()
+MENSAGEM_SEM_REDE = ("A pasta de dados da rede (unidade Z: ou Y:) não foi encontrada neste computador. "
+                     "Conecte-se à rede, confira se a unidade está mapeada e reabra o programa. "
+                     "Nada foi alterado.")
 
 
 def obter_diretorio_dados():
@@ -121,14 +141,36 @@ def caminho_sessao_local():
     return os.path.join(pasta_local, "sessao_hg.json")
 
 
-ARQUIVO_CONFIG = caminho_arquivo_dados("config.json")
-ARQUIVO_USUARIOS = caminho_arquivo_dados("usuarios.json")
-# Quem e Conta Mestre e de quais setores cada conta e - fica na MESMA pasta dos
-# demais arquivos do sistema (Z:), para valer em todos os computadores. Fonte da
-# verdade dessas duas informacoes: ver `SistemaGestaoHG._aplicar_permissoes`.
-ARQUIVO_PERMISSOES = caminho_arquivo_dados("permissoes_contas.json")
-PASTA_FOTOS = caminho_arquivo_dados("fotos_usuarios")
-PASTA_ANEXOS = caminho_arquivo_dados("anexos_tarefas")
+# ---- ARQUIVOS LEGADOS: o app so LE (importa uma vez e serve de copia de seguranca visual). Nunca grava. ----
+LEGADO_CONFIG = caminho_arquivo_dados("config.json")
+LEGADO_USUARIOS = caminho_arquivo_dados("usuarios.json")
+LEGADO_PERMISSOES = caminho_arquivo_dados("permissoes_contas.json")
+LEGADO_OCULTOS = caminho_arquivo_dados("veiculos_ocultos.json")
+LEGADO_PASTA_FOTOS = caminho_arquivo_dados("fotos_usuarios")
+LEGADO_PASTA_ANEXOS = caminho_arquivo_dados("anexos_tarefas")
+
+# ---- ARMAZENAMENTO ATUAL: tudo o que o app grava mora numa pasta propria, uma coisa em cada arquivo ----
+NOME_PASTA_DADOS = "HGhub-dados"
+PASTA_DADOS = os.path.join(obter_diretorio_dados(), NOME_PASTA_DADOS)
+
+
+def caminho_dado(*partes):
+    """Caminho dentro da pasta de dados atual (`HGhub-dados`)."""
+    return os.path.join(PASTA_DADOS, *partes)
+
+
+ARQUIVO_USUARIOS = caminho_dado("usuarios.json")                  # contas, e-mails, senhas (hash), permissoes
+ARQUIVO_PREFERENCIAS = caminho_dado("preferencias_usuarios.json") # notificacoes e favoritos de cada conta
+ARQUIVO_DEMANDAS = caminho_dado("demandas.json")                  # pastas > projetos > tarefas
+ARQUIVO_CATALOGOS = caminho_dado("catalogos.json")                # setores, cidades, etiquetas, anotacoes
+ARQUIVO_SESSOES = caminho_dado("sessoes.json")                    # sessoes abertas e codigos de recuperacao (hash)
+ARQUIVO_CONFIG = caminho_dado("configuracao.json")                # e-mail (SMTP) e planilha do Google
+ARQUIVO_OCULTOS = caminho_dado("manutencao_veiculos_ocultos.json")
+ARQUIVO_MIGRACAO = caminho_dado("_migracao.json")                 # marca que o legado ja foi importado
+ARQUIVO_TRAVA = caminho_dado("_trava")                            # trava entre PCs (gera _trava.lock)
+PASTA_FOTOS = caminho_dado("fotos")
+PASTA_ANEXOS = caminho_dado("anexos")
+PASTA_COPIAS = caminho_dado("copias")                             # copias de seguranca feitas antes de reimportar
 # Credencial de Service Account do Google, para o Modulo de Manutencao
 # Preventiva (backend/manutencao.py). Nunca versionar este arquivo.
 # Fica na raiz do projeto (BASE_DIR), nao na pasta de dados: e um segredo do
@@ -172,26 +214,27 @@ CONFIG_PADRAO = {
 
 
 def criar_arquivos_automaticamente():
-    """Garante a existencia de config.json e usuarios.json sem sobrescrever nada."""
-    os.makedirs(os.path.dirname(os.path.abspath(ARQUIVO_CONFIG)), exist_ok=True)   # instalacao nova: pasta ainda nao existe
-    if not os.path.exists(ARQUIVO_CONFIG):
+    """Garante a pasta de dados e o configuracao.json (nunca sobrescreve; nunca toca nos arquivos legados)."""
+    if SEM_REDE_BLOQUEADO:
+        return
+    os.makedirs(PASTA_DADOS, exist_ok=True)
+    if not os.path.exists(ARQUIVO_CONFIG) and not os.path.exists(ARQUIVO_MIGRACAO) and not os.path.exists(LEGADO_CONFIG):
         with open(ARQUIVO_CONFIG, "w", encoding="utf-8") as f:
             json.dump(CONFIG_PADRAO, f, indent=2, ensure_ascii=False)
 
-    if not os.path.exists(ARQUIVO_USUARIOS):
-        with open(ARQUIVO_USUARIOS, "w", encoding="utf-8") as f:
-            json.dump({"usuarios": []}, f, indent=2, ensure_ascii=False)
-
 
 def carregar_config():
-    """Le config.json, criando-o com valores padrao caso ainda nao exista."""
+    """Le o configuracao.json (o config.json legado e importado na migracao; depois disso so vale o novo)."""
     criar_arquivos_automaticamente()
-    try:
-        with open(ARQUIVO_CONFIG, "r", encoding="utf-8-sig") as f:
-            return json.load(f)
-    except Exception as erro:
-        log.warning("Falha ao ler config.json (%s). Usando configuracao padrao.", erro)
-        return CONFIG_PADRAO
+    for caminho in (ARQUIVO_CONFIG, LEGADO_CONFIG):
+        if os.path.exists(caminho):
+            try:
+                with open(caminho, "r", encoding="utf-8-sig") as f:
+                    return json.load(f)
+            except Exception as erro:
+                log.warning("Falha ao ler %s (%s).", caminho, erro)
+                break
+    return CONFIG_PADRAO
 
 
 # ==============================================================
@@ -205,24 +248,31 @@ def carregar_config():
 # essa criacao e atomica no sistema de arquivos, inclusive em unidades de rede
 # SMB, sem exigir nenhuma dependencia externa (nem migrar para outro banco).
 TEMPO_LIMITE_TRAVA_PADRAO = 20
-IDADE_MAXIMA_TRAVA_ORFA = 30  # segundos; acima disso, assume processo morto e destrava
+IDADE_MAXIMA_TRAVA_ORFA = 90  # segundos; acima disso, assume processo morto e destrava
 
 
 @contextlib.contextmanager
 def bloqueio_arquivo(caminho, tempo_limite=TEMPO_LIMITE_TRAVA_PADRAO):
     """Trava exclusiva entre processos para o ciclo ler-modificar-gravar de `caminho`.
 
-    Uso: `with bloqueio_arquivo(ARQUIVO_DADOS): ...` em volta de RELER o estado
-    mais recente do disco e GRAVAR de volta - nunca em volta de uma escrita que
-    parte de uma copia em memoria potencialmente desatualizada.
+    Uso: `with bloqueio_arquivo(ARQUIVO_TRAVA): ...` em volta de RELER o estado mais recente do disco e
+    GRAVAR de volta - nunca em volta de uma escrita que parte de uma copia em memoria desatualizada.
+
+    A trava tem DONO (maquina/processo/instante): so quem a criou a remove. Uma trava velha demais
+    (processo morto) e quebrada, mas o dono antigo nao apaga por engano a trava nova de outro PC.
     """
     caminho_trava = f"{caminho}.lock"
+    dono = f"{os.environ.get('COMPUTERNAME', '?')}|{os.getpid()}|{secrets.token_hex(6)}"
     inicio = time.time()
+    os.makedirs(os.path.dirname(os.path.abspath(caminho_trava)), exist_ok=True)
 
     while True:
         try:
             descritor = os.open(caminho_trava, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            os.close(descritor)
+            try:
+                os.write(descritor, dono.encode("utf-8"))
+            finally:
+                os.close(descritor)
             break
         except FileExistsError:
             try:
@@ -240,9 +290,15 @@ def bloqueio_arquivo(caminho, tempo_limite=TEMPO_LIMITE_TRAVA_PADRAO):
         yield
     finally:
         try:
-            os.remove(caminho_trava)
+            with open(caminho_trava, "r", encoding="utf-8") as f:
+                meu = f.read() == dono
         except OSError:
-            pass
+            meu = False
+        if meu:
+            try:
+                os.remove(caminho_trava)
+            except OSError:
+                pass
 
 
 # ==============================================================
@@ -279,6 +335,12 @@ def senha_e_texto_puro(hash_armazenado):
 def gerar_token():
     """Token de sessao opaco."""
     return secrets.token_urlsafe(48)
+
+
+def hash_token(token):
+    """Sessoes e codigos de recuperacao ficam no arquivo COMPARTILHADO so como hash: quem le o JSON nao
+    consegue usar o token. (O token em si so existe no PC de quem fez login.)"""
+    return hashlib.sha256((token or "").encode("utf-8")).hexdigest()
 
 
 def gerar_codigo_recuperacao():

@@ -15,28 +15,30 @@ a trava. Ver `SistemaGestaoHG.transacao` e `backend/utils.bloqueio_arquivo`.
 """
 
 import contextlib
-import json
 import logging
 import os
 import secrets
-import tempfile
 import threading
 import time
 import uuid
 from collections import Counter
 from datetime import datetime
 
+from . import armazenamento
 from .utils import (
-    ARQUIVO_DADOS,
-    ARQUIVO_PERMISSOES,
-    ARQUIVO_USUARIOS,
+    ARQUIVO_TRAVA,
+    LEGADO_PASTA_ANEXOS,
+    LEGADO_PASTA_FOTOS,
+    MENSAGEM_SEM_REDE,
     PASTA_ANEXOS,
     PASTA_FOTOS,
+    PASTA_LOCAL_APP,
+    SEM_REDE_BLOQUEADO,
     bloqueio_arquivo,
-    criar_arquivos_automaticamente,
-    caminho_arquivo_dados,
+    caminho_dado,
     gerar_token,
     hash_senha,
+    hash_token,
     senha_e_texto_puro,
     verificar_senha,
 )
@@ -108,10 +110,17 @@ class Status:
 # ==============================================================
 # USUARIO
 # ==============================================================
+_CAMPOS_CONHECIDOS_USUARIO = frozenset((
+    "id", "nome", "email", "senha", "senha_hash", "nova_senha", "nome_exibicao", "foto_perfil",
+    "codigo_recuperacao", "expiracao_codigo", "notificacoes", "favoritos", "setores", "setor", "conta_mestre",
+    "permissao_atualizada_em", "permissao_atualizada_por"))
+
+
 class Usuario:
     def __init__(self, id, nome, email, senha, nome_exibicao=None, foto_perfil=None,
                  codigo_recuperacao=None, expiracao_codigo=None, notificacoes=None, favoritos=None,
-                 setores=None, conta_mestre=False):
+                 setores=None, conta_mestre=False, nova_senha="", extras=None,
+                 permissao_atualizada_em=None, permissao_atualizada_por=None):
         self.id = id
         self.nome = nome
         self.email = email
@@ -126,6 +135,12 @@ class Usuario:
         # que acompanha Frota e Manutenção) - por isso lista, nao um campo unico.
         self.setores = setores or []
         self.conta_mestre = conta_mestre
+        # Senha nova escrita a mao no usuarios.json: convertida em hash e apagada na proxima carga.
+        self.nova_senha = nova_senha or ""
+        # Campos desconhecidos do registro (de versoes futuras / edicao manual): preservados ao regravar.
+        self.extras = extras or {}
+        self.permissao_atualizada_em = permissao_atualizada_em
+        self.permissao_atualizada_por = permissao_atualizada_por
         # False so quando o registro veio do disco SEM a chave `conta_mestre`: sinal de
         # que quem gravou por ultimo nao conhece essa funcionalidade (versao antiga do
         # programa) - ver `SistemaGestaoHG._aplicar_permissoes`. Nao e gravado.
@@ -138,10 +153,14 @@ class Usuario:
     def para_dict(self):
         """Forma completa, usada apenas na gravacao em disco."""
         return {
+            **self.extras,
             "id": self.id,
             "nome": self.nome,
             "email": self.email,
             "senha": self.senha,
+            "nova_senha": self.nova_senha,
+            "permissao_atualizada_em": self.permissao_atualizada_em,
+            "permissao_atualizada_por": self.permissao_atualizada_por,
             "nome_exibicao": self.nome_exibicao,
             "foto_perfil": self.foto_perfil,
             "codigo_recuperacao": self.codigo_recuperacao,
@@ -165,6 +184,7 @@ class Usuario:
             "favoritos": self.favoritos,
             "setores": self.setores,
             "conta_mestre": self.conta_mestre,
+            "setor_solicitado": self.extras.get("setor_solicitado") if not self.setores and not self.conta_mestre else None,
         }
 
     @staticmethod
@@ -194,6 +214,10 @@ class Usuario:
             # da primeira gravacao esse registro passa a ter a chave explicita,
             # e cadastros novos sempre nascem com False (ver rota /api/cadastro).
             dados.get("conta_mestre", True),
+            dados.get("nova_senha") or "",
+            {k: v for k, v in dados.items() if k not in _CAMPOS_CONHECIDOS_USUARIO},
+            dados.get("permissao_atualizada_em"),
+            dados.get("permissao_atualizada_por"),
         )
         usuario.permissao_explicita = "conta_mestre" in dados
         return usuario
@@ -425,12 +449,11 @@ class SistemaGestaoHG:
         self.cidades = []
         self.setores = []
         self.etiquetas_salvas = []
-        # Ultimo conteudo BOM lido do arquivo de permissoes: sustenta uma leitura que falhe
-        # por um instante (rede) sem soltar ninguem para "Conta Mestre" por engano.
-        self._permissoes_cache = None
         # E-mail de quem esta mudando permissoes na transacao atual (so para auditoria).
         self._autor_mudanca = None
-        self._aviso_permissoes_em = 0.0
+        self._perm_snapshot = {}
+        self._motivo_bloqueio = None
+        self._urgente = False
         self.status_padrao = [
             Status("Pendente", "#F5B800"),
             Status("Em Andamento", "#2563EB"),
@@ -440,14 +463,12 @@ class SistemaGestaoHG:
         self._lock = threading.RLock()
         self._ultima_gravacao_automatica = 0.0
         self._criar_pastas_de_arquivos()
-        if self._carregar_e_atualizar():
-            self.salvar_dados()
-        # Primeira execucao desta versao: cria permissoes_contas.json a partir do que as
-        # contas tem hoje (nao toca em nenhum arquivo que ja exista).
-        self._salvar_permissoes_json()
+        self.recarregar()
 
     # ---------- infraestrutura ----------
     def _criar_pastas_de_arquivos(self):
+        if SEM_REDE_BLOQUEADO:
+            return
         for pasta in (PASTA_FOTOS, PASTA_ANEXOS):
             try:
                 os.makedirs(pasta, exist_ok=True)
@@ -460,65 +481,62 @@ class SistemaGestaoHG:
     def obter_pasta_anexos(self):
         return PASTA_ANEXOS
 
+    def pasta_de_foto(self, nome):
+        """Pasta onde esta a foto (a nova ou, se for antiga, a pasta legada - so leitura). None se nao existe."""
+        return armazenamento.caminho_para_servir(PASTA_FOTOS, LEGADO_PASTA_FOTOS, nome)
+
+    def pasta_de_anexo(self, nome):
+        return armazenamento.caminho_para_servir(PASTA_ANEXOS, LEGADO_PASTA_ANEXOS, nome)
+
     def gerar_id(self):
         return str(uuid.uuid4())[:8]
 
     # ---------- persistencia ----------
-    def _carregar_dados(self):
-        """So le do disco para dentro dos atributos em memoria - nunca grava
-        nada aqui (isso e o que permite chamar isto a vontade em toda leitura,
-        sem transformar todo GET num respingo de escritas).
+    def _bloquear(self, motivo):
+        self._base_ilegivel = True
+        self._motivo_bloqueio = motivo
 
-        Excecao deliberada: se o arquivo AINDA nao existe (primeiiro uso desta
-        base), grava o admin inicial imediatamente. Sem isso, cada chamada
-        recriaria um admin com um `gerar_id()` (uuid) diferente do anterior -
-        e como esta funcao roda de novo dentro do MESMO request (uma vez no
-        `before_request`, outra dentro do `transacao()` do proprio /api/login),
-        a sessao seria criada para um id que o `transacao()` imediatamente
-        substituiria por outro, quebrando o login no primeiro uso do sistema.
-        """
-        if not os.path.exists(ARQUIVO_DADOS):
-            self.usuarios = [Usuario(self.gerar_id(), "Admin", "admin@redehg.com", hash_senha(self._senha_inicial_admin()),
-                                      conta_mestre=True)]
-            self.pastas = []
-            self.anotacoes = {}
-            self.sessoes = {}
-            self.cidades = []
-            self.setores = [SETOR_PADRAO]
-            self.etiquetas_salvas = []
-            self.salvar_dados()
+    def _carregar_dados(self, travado=False):
+        """So le do disco para dentro dos atributos em memoria. A unica excecao e a PRIMEIRA execucao de uma
+        base nova (ou a migracao do legado, ver `armazenamento.garantir_migrado`): ai a base e criada sob a
+        trava de arquivo. Se algo existe mas nao e lido, as gravacoes ficam BLOQUEADAS (nada e sobrescrito)."""
+        if SEM_REDE_BLOQUEADO:
+            self._bloquear(MENSAGEM_SEM_REDE)
             return
-
         try:
-            with open(ARQUIVO_DADOS, "r", encoding="utf-8-sig") as f:
-                dados = json.load(f)
-
-            # usuarios.json e a fonte preferida; o array dentro do arquivo de dados
-            # e o fallback para bases antigas.
-            usuarios_json = self._carregar_usuarios_json()
-            if usuarios_json:
-                self.usuarios = usuarios_json
-            else:
-                self.usuarios = [Usuario.de_dict(u) for u in dados.get("usuarios", [])]
-
-            self.pastas = [Pasta.de_dict(p, self) for p in dados.get("pastas", [])]
-            self.anotacoes = dados.get("anotacoes", {})
-            self.sessoes = dados.get("sessoes", {})
-            self.cidades = dados.get("cidades", [])
-            self.setores = dados.get("setores") or [SETOR_PADRAO]
-            self.etiquetas_salvas = dados.get("etiquetas_salvas", [])
+            armazenamento.garantir_migrado(travado=travado)
+            estado = armazenamento.ler_estado()
+            if estado is None:
+                with (contextlib.nullcontext() if travado else bloqueio_arquivo(ARQUIVO_TRAVA, tempo_limite=60)):
+                    estado = armazenamento.ler_estado()
+                    if estado is None:
+                        self.usuarios = [Usuario(self.gerar_id(), "Admin", "admin@redehg.com",
+                                                 hash_senha(self._senha_inicial_admin()), conta_mestre=True)]
+                        self.pastas, self.anotacoes, self.sessoes, self.cidades = [], {}, {}, []
+                        self.setores, self.etiquetas_salvas = [SETOR_PADRAO], []
+                        self._base_ilegivel = False
+                        self._motivo_bloqueio = None
+                        self.salvar_dados()
+                        return
+            self.usuarios = [Usuario.de_dict(u) for u in estado["usuarios"]]
+            self.pastas = [Pasta.de_dict(p, self) for p in estado["pastas"]]
+            self.anotacoes = estado["anotacoes"]
+            self.sessoes = estado["sessoes"]
+            self.cidades = estado["cidades"]
+            self.setores = estado["setores"] or [SETOR_PADRAO]
+            self.etiquetas_salvas = estado["etiquetas_salvas"]
             self._base_ilegivel = False
+            self._motivo_bloqueio = None
         except Exception as erro:
-            # O arquivo EXISTE mas nao foi lido (truncado, rede instavel, registro invalido...). Seguir
-            # com o estado vazio e gravar na proxima escrita APAGARIA a base inteira: bloqueia as gravacoes.
-            self._base_ilegivel = True
-            log.error("Erro ao carregar dados de %s: %s. Gravacoes bloqueadas para proteger a base.", ARQUIVO_DADOS, erro)
+            # Algo EXISTE mas nao foi lido (truncado, JSON editado a mao com erro, rede instavel...). Seguir com o
+            # estado vazio e gravar na proxima escrita APAGARIA a base inteira: bloqueia as gravacoes.
+            log.error("Erro ao carregar os dados (%s). Gravacoes bloqueadas para proteger a base.", erro)
+            self._bloquear(f"A base de dados não pôde ser lida agora ({erro}). Nada foi alterado.")
 
         if not self.usuarios and not self._base_ilegivel:
-            self.usuarios.append(Usuario(self.gerar_id(), "Admin", "admin@redehg.com", hash_senha(self._senha_inicial_admin()),
-                                          conta_mestre=True))
-
-        self._aplicar_permissoes()
+            self.usuarios.append(Usuario(self.gerar_id(), "Admin", "admin@redehg.com",
+                                         hash_senha(self._senha_inicial_admin()), conta_mestre=True))
+        self._perm_snapshot = {u.id: (bool(u.conta_mestre), tuple(u.setores)) for u in self.usuarios}
 
     def _senha_inicial_admin(self):
         """Senha da conta Admin criada numa base nova: ALEATORIA (ou HGHUB_ADMIN_SENHA). Nunca fixa no codigo.
@@ -528,13 +546,34 @@ class SistemaGestaoHG:
             return definida
         senha = secrets.token_urlsafe(9)
         try:
-            with open(caminho_arquivo_dados("SENHA_INICIAL_ADMIN.txt"), "w", encoding="utf-8") as f:
+            os.makedirs(os.path.dirname(caminho_dado("x")), exist_ok=True)
+            with open(caminho_dado("SENHA_INICIAL_ADMIN.txt"), "w", encoding="utf-8") as f:
                 f.write("Conta inicial do sistema\nE-mail: admin@redehg.com\nSenha: " + senha +
                         "\n\nApos o primeiro acesso, APAGUE este arquivo.\n")
             log.warning("Conta admin criada numa base nova; a senha inicial esta em SENHA_INICIAL_ADMIN.txt (pasta de dados).")
         except OSError:
             log.error("Conta admin criada, mas nao foi possivel gravar a senha inicial; defina HGHUB_ADMIN_SENHA.")
         return senha
+
+    def _aplicar_edicoes_manuais(self):
+        """Alteracoes feitas a mao no usuarios.json: `nova_senha` vira hash (e a pessoa e deslogada)."""
+        mudou = False
+        for usuario in self.usuarios:
+            if not usuario.nova_senha:
+                continue
+            if len(usuario.nova_senha) >= 6 and usuario.nova_senha.strip():
+                usuario.senha = hash_senha(usuario.nova_senha)
+                usuario.codigo_recuperacao = None
+                usuario.expiracao_codigo = None
+                self.sessoes = {t: s for t, s in self.sessoes.items() if s.get("usuario_id") != usuario.id}
+                log.warning("Senha de %s trocada pelo campo nova_senha do usuarios.json.", usuario.email)
+            else:
+                log.warning("nova_senha de %s ignorada: precisa ter pelo menos 6 caracteres.", usuario.email)
+            usuario.nova_senha = ""
+            mudou = True
+        if mudou:
+            self._urgente = True
+        return mudou
 
     def _aplicar_automacoes_de_data(self):
         """Regra 4 do negocio: o status segue a data real, nao so o clique do usuario.
@@ -585,268 +624,73 @@ class SistemaGestaoHG:
                 mudou = True
         return mudou
 
-    def _carregar_e_atualizar(self):
-        """Recarrega do disco e aplica automacao de datas + setores em memoria."""
-        self._carregar_dados()
+    def _carregar_e_atualizar(self, travado=False):
+        """Recarrega do disco e aplica automacao de datas + setores + edicoes manuais em memoria."""
+        self._carregar_dados(travado=travado)
+        if self._base_ilegivel:
+            return False
         mudou_datas = self._aplicar_automacoes_de_data()
         mudou_setores = self._sincronizar_setores_com_pastas()
-        return mudou_datas or mudou_setores
+        mudou_manual = self._aplicar_edicoes_manuais()
+        return mudou_datas or mudou_setores or mudou_manual
 
     def recarregar(self):
-        """Caminho de LEITURA (sem trava DE ARQUIVO): sempre reflete o disco
-        mais recente de qualquer outro processo, mais a automacao de datas ja
-        computada.
+        """Caminho de LEITURA: sempre reflete o disco mais recente de qualquer outro PC.
 
-        `self._lock` (em memoria, threading.RLock - nunca espera rede) protege
-        so a recarga+atribuicao contra outra THREAD do mesmo processo dentro
-        de `transacao()`: sem isso, `_carregar_e_atualizar()` podia reatribuir
-        `self.sessoes`/`self.usuarios`/etc. NO MEIO de um login/logout/edicao
-        em outra thread (Flask roda com `threaded=True`), fazendo a sessao ou
-        a mudanca recem-criada "desaparecer" silenciosamente - foi exatamente
-        o bug relatado de uma Conta Mestre levando 403 do nada. Continua
-        deliberadamente SEM `bloqueio_arquivo` (a trava de arquivo, entre
-        processos/PCs, que pode ser lenta numa rede) - so a`transacao()` paga
-        esse custo, porque so ela de fato precisa de exclusao entre PCs.
-
-        Se a automacao mudou algo, tenta persistir - mas com timeout curto e
-        falha silenciosa (so um aviso no log), porque isto roda a cada
-        requisicao da API e uma rede lenta/ocupada nao pode travar uma leitura.
-        A proxima escrita real (via `transacao`) persiste de qualquer forma.
+        `self._lock` (em memoria) protege a recarga contra outra THREAD do mesmo processo no meio de uma
+        `transacao()`. Se a automacao (datas, setores, senha nova) mudou algo, a persistencia refaz TUDO sob a
+        trava de arquivo - recarrega, reaplica e so entao grava - para nunca gravar uma copia envelhecida por cima
+        do que outro PC acabou de salvar. Com timeout curto e falha silenciosa: a proxima escrita real persiste.
         """
         with self._lock:
             mudou = self._carregar_e_atualizar()
-        if not mudou:
+        if not mudou or self._base_ilegivel:
             return
-
         agora = time.time()
-        if agora - self._ultima_gravacao_automatica < INTERVALO_MINIMO_ENTRE_GRAVACOES_AUTOMATICAS:
+        if not self._urgente and agora - self._ultima_gravacao_automatica < INTERVALO_MINIMO_ENTRE_GRAVACOES_AUTOMATICAS:
             return
         self._ultima_gravacao_automatica = agora
         try:
-            with bloqueio_arquivo(ARQUIVO_DADOS, tempo_limite=2):
-                self.salvar_dados()
+            with bloqueio_arquivo(ARQUIVO_TRAVA, tempo_limite=2):
+                with self._lock:
+                    if self._carregar_e_atualizar(travado=True) and not self._base_ilegivel:
+                        self.salvar_dados()
+                        self._urgente = False
         except Exception as erro:
-            log.warning("Automação de datas calculada, mas não foi possível persistir agora: %s", erro)
+            log.warning("Automação calculada, mas não foi possível persistir agora: %s", erro)
 
     @contextlib.contextmanager
     def transacao(self):
-        """Todo caminho de ESCRITA passa por aqui: trava -> recarrega o estado
-        mais recente do disco -> o chamador aplica a mudança -> grava -> destrava.
-
-        Isso fecha o "lost update" ENTRE PROCESSOS/PCs: sem recarregar sob a
-        trava de arquivo (`bloqueio_arquivo`), duas maquinas salvando ao mesmo
-        tempo partiriam cada uma de uma copia em memória desatualizada, e o
-        segundo save apagaria silenciosamente o primeiro.
-
-        `self._lock` (em memoria) fecha a MESMA janela DENTRO do processo:
-        sem ela, uma `recarregar()` de outra thread (chamada antes de toda
-        requisicao da API, via `before_request`) podia reatribuir
-        `self.sessoes`/`self.usuarios`/etc. bem no meio desta transacao,
-        fazendo a mudança que o chamador acabou de aplicar (ex.: uma sessão de
-        login recém-criada) sumir antes mesmo de `salvar_dados()` rodar - ver
-        `recarregar()` para o relato completo do bug. É um `RLock`, então
-        chamadas reentrantes (`salvar_dados()` também o adquire) não travam.
-        """
-        with bloqueio_arquivo(ARQUIVO_DADOS):
+        """Todo caminho de ESCRITA passa por aqui: trava -> recarrega o estado mais recente do disco -> o
+        chamador aplica a mudanca -> grava -> destrava. Isso fecha o "lost update" ENTRE PCs; o `self._lock`
+        fecha a mesma janela DENTRO do processo (e e um RLock: chamadas reentrantes nao travam)."""
+        if SEM_REDE_BLOQUEADO:
+            raise BaseIlegivelError(MENSAGEM_SEM_REDE)
+        with bloqueio_arquivo(ARQUIVO_TRAVA):
             with self._lock:
-                self._carregar_e_atualizar()
+                self._carregar_e_atualizar(travado=True)
                 if self._base_ilegivel:
-                    raise BaseIlegivelError("A base de dados nao pode ser lida; nada foi alterado.")
+                    raise BaseIlegivelError(self._motivo_bloqueio or "A base de dados nao pode ser lida; nada foi alterado.")
                 yield self
                 self.salvar_dados()
 
-    # ---------- permissoes das contas (permissoes_contas.json) ----------
-    def _ler_permissoes(self):
-        """Le o arquivo de permissoes. Devolve (estado, contas):
-
-        - ("ausente", None)     o arquivo ainda nao existe (primeira execucao desta versao);
-        - ("ok", {email: ...})  lido (e guardado em `_permissoes_cache`);
-        - ("ilegivel", cache)   erro de leitura/JSON: o ultimo conteudo bom em memoria, ou None.
-        """
-        try:
-            if not os.path.exists(ARQUIVO_PERMISSOES):
-                return "ausente", None
-            with open(ARQUIVO_PERMISSOES, "r", encoding="utf-8") as f:
-                dados = json.load(f)
-            contas = dados.get("contas")
-            if not isinstance(contas, dict):
-                raise ValueError("a chave 'contas' esta ausente ou invalida")
-            self._permissoes_cache = contas
-            return "ok", contas
-        except Exception as erro:
-            agora = time.time()
-            if agora - self._aviso_permissoes_em > 60:  # roda a cada requisicao: nao inunda o log
-                self._aviso_permissoes_em = agora
-                log.error("Nao foi possivel ler permissoes_contas.json (%s). Mantendo o ultimo estado conhecido.", erro)
-            return "ilegivel", self._permissoes_cache
-
-    def _aplicar_permissoes(self):
-        """Faz o arquivo de permissoes valer sobre `conta_mestre`/`setores` de cada conta.
-
-        Por que existe: usuarios.json e o arquivo de dados sao regravados por TODOS os
-        PCs, inclusive por versoes antigas do programa que nao conhecem `conta_mestre`
-        nem `setores` e os apagam ao salvar - e a leitura seguinte tratava a chave
-        ausente como "Conta Mestre" (padrao de migracao, ver `Usuario.de_dict`). Resultado:
-        todo mundo virava mestre, sem setor. O arquivo de permissoes e separado, nenhuma
-        versao antiga o toca, e passa a ser a fonte da verdade:
-
-        1. conta com entrada no arquivo -> vale o que o arquivo diz;
-        2. sem entrada, mas o registro tem `conta_mestre` explicito -> foi gravada por uma
-           versao que conhece permissoes: vale o proprio registro (a entrada nasce no
-           proximo salvamento);
-        3. sem entrada e registro sem a chave -> criada/regravada por versao antiga: sem
-           permissao nenhuma (conta comum, sem setor) ate uma Conta Mestre liberar -
-           falha FECHADA, nunca "mestre por omissao".
-
-        Na primeira execucao (arquivo ainda inexistente) nada muda: o registro manda e o
-        arquivo e criado a partir dele, entao ninguem perde o acesso que ja tinha.
-        """
-        estado, contas = self._ler_permissoes()
-        if estado == "ilegivel" and contas is None:
-            return
-        if estado == "ausente":
-            if self._permissoes_cache is None:
-                return
-            contas = self._permissoes_cache
-        por_id = {c.get("id"): c for c in contas.values() if c.get("id")}
-        for usuario in self.usuarios:
-            entrada = contas.get((usuario.email or "").strip().lower()) or por_id.get(usuario.id)
-            if entrada is not None:
-                usuario.conta_mestre = bool(entrada.get("conta_mestre"))
-                usuario.setores = [s.strip() for s in (entrada.get("setores") or [])
-                                   if isinstance(s, str) and s.strip()]
-            elif not usuario.permissao_explicita:
-                usuario.conta_mestre = False
-                usuario.setores = []
-
-    def _salvar_permissoes_json(self):
-        """Mantem permissoes_contas.json em dia com as contas. So acrescenta/atualiza:
-        entradas de contas que nao estao em memoria nunca sao apagadas, e um arquivo
-        existente que nao consiga ser lido NUNCA e sobrescrito (pior do que ficar sem
-        gravar). So grava quando algo mudou.
-
-        Roda dentro de `salvar_dados()` (portanto sob a trava de arquivo dos dados e a
-        trava em memoria); so a criacao inicial, feita no construtor, usa trava propria."""
-        try:
-            existentes = None
-            if os.path.exists(ARQUIVO_PERMISSOES):
-                with open(ARQUIVO_PERMISSOES, "r", encoding="utf-8") as f:
-                    existentes = json.load(f).get("contas")
-                if not isinstance(existentes, dict):
-                    raise ValueError("a chave 'contas' esta ausente ou invalida")
-            elif self._permissoes_cache is not None:
-                log.warning("permissoes_contas.json sumiu da pasta de dados; nao vou recria-lo sozinho "
-                            "(pode ser uma falha momentanea da rede).")
-                return
-        except Exception as erro:
-            log.error("permissoes_contas.json existe mas nao pode ser lido (%s): NAO sera sobrescrito.", erro)
-            return
-
-        if existentes is not None:
-            self._gravar_permissoes(existentes)
-            return
-        # Criacao inicial: trava propria e rechecagem, para dois PCs iniciando juntos
-        # nao semearem em cima um do outro.
-        try:
-            with bloqueio_arquivo(ARQUIVO_PERMISSOES, tempo_limite=5):
-                if not os.path.exists(ARQUIVO_PERMISSOES):
-                    self._gravar_permissoes({}, criando=True)
-        except Exception as erro:
-            log.error("Nao foi possivel criar permissoes_contas.json: %s", erro)
-
-    def _gravar_permissoes(self, existentes, criando=False):
+    def _carimbar_permissoes(self):
+        """Registra quem/quando mudou conta mestre ou setores de uma conta (auditoria dentro do usuarios.json)."""
         agora = datetime.now().strftime(FORMATO_DATA_HORA)
-        por_id = {c.get("id"): chave for chave, c in existentes.items() if c.get("id")}
-        contas = {chave: dict(valor) for chave, valor in existentes.items()}
-        mudou = criando
         for usuario in self.usuarios:
-            chave = (usuario.email or "").strip().lower()
-            if not chave:
-                continue
-            anterior = contas.get(chave)
-            if anterior is None and usuario.id in por_id:
-                anterior = contas.pop(por_id[usuario.id], None)
-            atuais = {"conta_mestre": bool(usuario.conta_mestre), "setores": list(usuario.setores or [])}
-            entrada = {"id": usuario.id, "nome": usuario.nome_display, "email": usuario.email, **atuais}
-            if anterior is None or any(anterior.get(k) != v for k, v in atuais.items()):
-                entrada["atualizado_em"] = agora
-                entrada["atualizado_por"] = self._autor_mudanca or "sistema"
-            else:
-                entrada["atualizado_em"] = anterior.get("atualizado_em")
-                entrada["atualizado_por"] = anterior.get("atualizado_por")
-            if entrada != contas.get(chave):
-                mudou = True
-            contas[chave] = entrada
-        if not mudou:
-            return
-        self._escrever_json(ARQUIVO_PERMISSOES, {
-            "_leia_me": (
-                "Quem e Conta Mestre e de quais setores cada conta e. Este arquivo vale para todos os "
-                "computadores e e a fonte da verdade dessas permissoes (mudar 'conta_mestre' ou 'setores' "
-                "no usuarios.json NAO tem efeito). Gerenciado pelo sistema (menu Gerenciar usuarios); se "
-                "editar a mao, mantenha o JSON valido e nao apague contas."
-            ),
-            "atualizado_em": agora,
-            "contas": contas,
-        })
-        self._permissoes_cache = contas
+            atual = (bool(usuario.conta_mestre), tuple(usuario.setores))
+            if self._perm_snapshot.get(usuario.id) != atual:
+                usuario.permissao_atualizada_em = agora
+                usuario.permissao_atualizada_por = self._autor_mudanca or "sistema"
+        self._perm_snapshot = {u.id: (bool(u.conta_mestre), tuple(u.setores)) for u in self.usuarios}
         self._autor_mudanca = None
-
-    def _carregar_usuarios_json(self):
-        try:
-            if os.path.exists(ARQUIVO_USUARIOS):
-                with open(ARQUIVO_USUARIOS, "r", encoding="utf-8") as f:
-                    dados = json.load(f)
-                lista = dados.get("usuarios", [])
-                if lista:
-                    return [Usuario.de_dict(u) for u in lista]
-        except Exception as erro:
-            log.error("Erro ao carregar usuarios.json: %s", erro)
-        return None
-
-    def _escrever_json(self, caminho, dados):
-        """Grava de forma atomica: um crash no meio da escrita nunca trunca o arquivo.
-
-        Importante porque o arquivo de producao pode estar em uma unidade de rede.
-        """
-        destino = os.path.dirname(os.path.abspath(caminho)) or "."
-        os.makedirs(destino, exist_ok=True)
-        descritor, temporario = tempfile.mkstemp(dir=destino, suffix=".tmp")
-        try:
-            with os.fdopen(descritor, "w", encoding="utf-8") as f:
-                json.dump(dados, f, indent=2, ensure_ascii=False)
-                f.flush()
-                os.fsync(f.fileno())
-            for tentativa in range(4):          # rede/antivirus seguram o arquivo por instantes (WinError 5)
-                try:
-                    os.replace(temporario, caminho)
-                    break
-                except PermissionError:
-                    if tentativa == 3:
-                        raise
-                    time.sleep(0.25 * (tentativa + 1))
-        except Exception:
-            if os.path.exists(temporario):
-                try:
-                    os.remove(temporario)
-                except OSError:
-                    pass
-            raise
-
-    def _salvar_usuarios_json(self):
-        try:
-            criar_arquivos_automaticamente()
-            self._escrever_json(ARQUIVO_USUARIOS, {"usuarios": [u.para_dict() for u in self.usuarios]})
-        except Exception as erro:
-            log.error("Erro ao salvar usuarios.json: %s", erro)
 
     def salvar_dados(self):
         with self._lock:
             if self._base_ilegivel:
-                raise BaseIlegivelError("A base de dados nao pode ser lida; nada foi gravado para nao perde-la.")
-            self._salvar_usuarios_json()
-            self._salvar_permissoes_json()
-            dados = {
+                raise BaseIlegivelError(self._motivo_bloqueio or "A base de dados nao pode ser lida; nada foi gravado para nao perde-la.")
+            self._carimbar_permissoes()
+            estado = {
                 "usuarios": [u.para_dict() for u in self.usuarios],
                 "pastas": [p.para_dict() for p in self.pastas],
                 "anotacoes": self.anotacoes,
@@ -856,11 +700,10 @@ class SistemaGestaoHG:
                 "etiquetas_salvas": self.etiquetas_salvas,
             }
             try:
-                self._escrever_json(ARQUIVO_DADOS, dados)
+                armazenamento.gravar_estado(estado)
             except Exception as erro:
-                # NAO engolir: se a gravacao falhar o chamador precisa saber (antes a API respondia
-                # "sucesso" e a alteracao se perdia em silencio).
-                log.error("Erro ao salvar dados em %s: %s", ARQUIVO_DADOS, erro)
+                # NAO engolir: se a gravacao falhar o chamador precisa saber.
+                log.error("Erro ao salvar dados: %s", erro)
                 raise
 
     # ---------- consultas ----------
@@ -1001,8 +844,11 @@ class SistemaGestaoHG:
         if not verificar_senha(senha, usuario.senha):
             return None
         if senha_e_texto_puro(usuario.senha):
-            usuario.senha = hash_senha(senha)
-            self.salvar_dados()
+            with self.transacao():
+                atual = self.buscar_usuario(usuario.id)
+                if atual:
+                    atual.senha = hash_senha(senha)
+                    usuario = atual
         return usuario
 
     def criar_sessao(self, usuario_id):
@@ -1010,7 +856,8 @@ class SistemaGestaoHG:
         agora = datetime.now()
         # limpa as vencidas para o arquivo compartilhado nao crescer para sempre
         self.sessoes = {t: s for t, s in self.sessoes.items() if not self._sessao_vencida(s, agora)}
-        self.sessoes[token] = {"usuario_id": usuario_id, "criada_em": agora.isoformat()}
+        # no arquivo compartilhado fica so o HASH do token: ler o JSON nao da acesso a ninguem
+        self.sessoes[hash_token(token)] = {"usuario_id": usuario_id, "criada_em": agora.isoformat()}
         self.salvar_dados()
         return token
 
@@ -1025,14 +872,15 @@ class SistemaGestaoHG:
     def validar_sessao(self, token):
         if not token:
             return None
-        sessao = self.sessoes.get(token)
+        sessao = self.sessoes.get(hash_token(token))
         if not sessao or self._sessao_vencida(sessao):
             return None
         return self.buscar_usuario(sessao.get("usuario_id"))
 
     def encerrar_sessao(self, token):
-        if token in self.sessoes:
-            del self.sessoes[token]
+        chave = hash_token(token)
+        if chave in self.sessoes:
+            del self.sessoes[chave]
             self.salvar_dados()
             return True
         return False
@@ -1126,7 +974,9 @@ class SistemaGestaoHG:
 
         nome_arquivo = f"relatorio_demandas_{setor}.xlsx" if (usuario and usuario.conta_mestre and setor) \
             else "relatorio_demandas.xlsx"
-        caminho = caminho_arquivo_dados(nome_arquivo)
+        pasta_saida = os.path.join(PASTA_LOCAL_APP, "exportacoes")   # no PC de quem exporta, nao na pasta de dados
+        os.makedirs(pasta_saida, exist_ok=True)
+        caminho = os.path.join(pasta_saida, nome_arquivo)
         pd.DataFrame(linhas).to_excel(caminho, index=False)
         return caminho
 

@@ -17,30 +17,46 @@ function token(nome) {
 }
 
 /* ---------- Indicadores ---------- */
-const INDICADORES = [
-  { chave: 'total', rotulo: 'Demandas registradas', icone: 'ph-stack', tom: 'brand', nota: 'Todas as pastas' },
-  { chave: 'pendentes', rotulo: 'Pendentes', icone: 'ph-clock', tom: 'gold', nota: 'Aguardando início' },
-  { chave: 'andamento', rotulo: 'Em andamento', icone: 'ph-spinner-gap', tom: 'brand', nota: 'Sendo executadas' },
-  { chave: 'concluidas', rotulo: 'Concluídas', icone: 'ph-check-circle', tom: 'green', nota: 'Trabalho entregue' },
-  { chave: 'atrasadas', rotulo: 'Atrasadas', icone: 'ph-warning', tom: 'red', nota: 'Prazo estourado' },
-  { chave: 'alta_prioridade', rotulo: 'Alta prioridade', icone: 'ph-arrow-up', tom: 'red', nota: 'Em aberto e urgentes' },
-  { chave: 'bloqueadas', rotulo: 'Bloqueadas', icone: 'ph-lock-simple', tom: 'neutral', nota: 'Esperando dependências' },
-  { chave: 'taxa_cumprimento', rotulo: 'Prazos cumpridos', icone: 'ph-percent', tom: 'green', nota: 'Das demandas concluídas', sufixo: '%' },
+const ATENCAO = [
+  { chave: 'atrasadas', rotulo: 'Atrasadas', icone: 'ph-warning', tom: 'red', nota: 'Prazo estourado', ok: 'Nenhuma atrasada' },
+  { chave: 'alta_prioridade', rotulo: 'Alta prioridade', icone: 'ph-arrow-up', tom: 'orange', nota: 'Em aberto e urgentes', ok: 'Nenhuma urgente' },
+  { chave: 'bloqueadas', rotulo: 'Bloqueadas', icone: 'ph-lock-simple', tom: 'neutral', nota: 'Esperando dependências', ok: 'Nenhuma bloqueada' },
+];
+
+const RESUMO = [
+  { chave: 'total', rotulo: 'Registradas' },
+  { chave: 'pendentes', rotulo: 'Pendentes' },
+  { chave: 'andamento', rotulo: 'Em andamento' },
+  { chave: 'concluidas', rotulo: 'Concluídas' },
+  { chave: 'taxa_cumprimento', rotulo: 'Prazos cumpridos', sufixo: '%' },
 ];
 
 function renderIndicadores(cards) {
   const container = el('kpis');
   if (!container) return;
+  container.classList.add('kpis--v2');
 
-  container.innerHTML = INDICADORES.map((indicador) => `
-    <div class="kpi kpi--${indicador.tom}">
-      <div class="kpi__head">
-        <span class="kpi__icon"><i class="ph ${indicador.icone}"></i></span>
-        <span class="kpi__label">${escapar(indicador.rotulo)}</span>
-      </div>
-      <p class="kpi__value">${cards[indicador.chave] ?? 0}${indicador.sufixo ? `<small>${indicador.sufixo}</small>` : ''}</p>
-      <p class="kpi__foot">${escapar(indicador.nota)}</p>
-    </div>`).join('');
+  // O que exige ação vem primeiro e ganha peso; o restante e contexto, em linha (sem 8 cartoes iguais).
+  const itens = ATENCAO.map((i) => {
+    const n = cards[i.chave] ?? 0;
+    return `
+      <div class="atencao__item atencao__item--${n > 0 ? i.tom : 'zero'}">
+        <span class="atencao__icone"><i class="ph ${n > 0 ? i.icone : 'ph-check-circle'}"></i></span>
+        <span class="atencao__numero">${n}</span>
+        <span class="atencao__rotulo">${escapar(i.rotulo)}</span>
+        <span class="atencao__nota">${escapar(n > 0 ? i.nota : i.ok)}</span>
+      </div>`;
+  }).join('');
+
+  const resumo = RESUMO.map((i) => `
+      <div class="resumo__item">
+        <dt>${escapar(i.rotulo)}</dt>
+        <dd>${cards[i.chave] ?? 0}${i.sufixo ? `<small>${i.sufixo}</small>` : ''}</dd>
+      </div>`).join('');
+
+  container.innerHTML = `
+    <section class="atencao" aria-label="Precisa de atenção">${itens}</section>
+    <dl class="resumo">${resumo}</dl>`;
 }
 
 /* ---------- Gráficos ---------- */

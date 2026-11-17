@@ -22,12 +22,29 @@ seus dados. Em **Atualizações** (menu lateral) dá para verificar na hora e **
 | O quê | Onde | Apagado ao atualizar? |
 |---|---|---|
 | Programa | `%LOCALAPPDATA%\Programs\HGhub` | substituído |
-| Dados do sistema (tarefas, usuários, fotos, anexos, `config.json`) | pasta de rede `Z:`/`Y:` `\SGQ\01 - QUALIDADE\SISTEMA DEMANDAS - Copia` | **nunca** |
+| **Dados do sistema (base atual)** | pasta de rede `Z:`/`Y:` `\SGQ - QUALIDADE\SISTEMA DEMANDAS - Copia\HGhub-dados` | **nunca** |
+| Arquivos antigos (`dados_sistema_hg.json`, `usuarios.json`, `config.json`...) | a pasta acima (um nível) — **somente leitura**, copia de segurança visual | **nunca** |
 | Credenciais do Google, logs, estado do atualizador, cópias dos instaladores | `%LOCALAPPDATA%\HGhub` | **nunca** |
 | Sessão do usuário | `%APPDATA%\HGHub\sessao_hg.json` | **nunca** |
 
-Sem a pasta de rede, uma base local nova é criada em `%LOCALAPPDATA%\HGhub\dados`. Para apontar outra base
-(testes): variável de ambiente `HGHUB_ARQUIVO_DADOS`.
+### A pasta `HGhub-dados` (uma coisa em cada arquivo)
+
+| Arquivo | Conteúdo |
+|---|---|
+| `usuarios.json` | contas: nome, e-mail, setores, conta mestre, senha (**hash**). Editável à mão: veja `LEIA-ME.txt` na pasta (campo `nova_senha` troca a senha de alguém) |
+| `preferencias_usuarios.json` | notificações e favoritos de cada conta |
+| `demandas.json` | pastas → projetos → tarefas |
+| `catalogos.json` | setores, cidades, etiquetas salvas, anotações |
+| `sessoes.json` | sessões abertas e códigos de recuperação — **só hashes** (ler o arquivo não dá acesso a ninguém) |
+| `configuracao.json` | e-mail (SMTP) e planilha do Google |
+| `fotos\`, `anexos\` | arquivos enviados (os antigos continuam sendo servidos da pasta antiga) |
+| `copias\` | cópias de segurança feitas antes de reimportar do legado |
+
+Na **primeira abertura** da 1.1.0 o programa importa tudo o que existe nos arquivos antigos para `HGhub-dados`
+(sem alterá-los). Se algum PC ainda usar uma versão antiga e gravar nos arquivos antigos, a Conta Mestre vê o aviso
+e pode **somar** o que falta (`/api/armazenamento/reimportar`; nunca remove nem sobrescreve nada da base nova).
+Sem a pasta de rede o programa **não** abre uma base local vazia: mostra o motivo e não grava nada
+(para uso offline deliberado: `%LOCALAPPDATA%\HGhub\config_local.json` com `{"permitir_base_local": true}`).
 
 ## Desenvolvimento
 

@@ -88,10 +88,14 @@ export async function fazerCadastro(evento) {
 
   carregando(botao, true, 'Criando...');
   try {
-    await api.cadastrar(nome, email, senha, setor);
+    const resposta = await api.cadastrar(nome, email, senha, setor);
     fecharModal('modal-cadastro');
     evento.target.reset();
-    toast('Conta criada', 'Já pode entrar com esse e-mail e senha.');
+    if (resposta.pendente) {
+      toast('Conta criada — aguardando liberação', resposta.message, 'warning');
+    } else {
+      toast('Conta criada', 'Já pode entrar com esse e-mail e senha.');
+    }
     definirValor('login-email', email);
   } catch (erro) {
     toast('Não foi possível cadastrar', erro.message, 'error');
@@ -140,7 +144,13 @@ export async function restaurarSessao() {
       return true;
     }
   } catch (erro) {
-    sessao.limpar();
+    // Base indisponivel (rede fora do ar, arquivo em manutencao): a sessao continua valida no servidor,
+    // entao NAO e apagada - so avisamos o motivo. Qualquer outro erro (401...) encerra a sessao local.
+    if (erro.status === 503) {
+      toast('Sistema indisponível', erro.message, 'error');
+    } else {
+      sessao.limpar();
+    }
   }
   return false;
 }

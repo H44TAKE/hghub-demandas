@@ -18,7 +18,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 
 PROIBIDOS = {"credenciais.json", "config.json", "usuarios.json", "dados_sistema_hg.json", "permissoes_contas.json",
-             "veiculos_ocultos.json", "sessao_hg.json", "SENHA_INICIAL_ADMIN.txt"}
+             "veiculos_ocultos.json", "sessao_hg.json", "SENHA_INICIAL_ADMIN.txt", "configuracao.json", "preferencias_usuarios.json", "sessoes.json", "demandas.json", "catalogos.json"}
 
 
 def achar_iscc():

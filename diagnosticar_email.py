@@ -7,12 +7,13 @@ SEM ENVIAR NENHUMA MENSAGEM. Mostra se a senha de app da conta remetente esta va
 Le o `smtp` do config.json da pasta de dados (Z:/Y:, a mesma que o sistema usa); so le, nunca grava.
 Nunca imprime a senha."""
 import json
+import os
 import smtplib
 import sys
 
 from backend import utils
 
-config = json.load(open(utils.ARQUIVO_CONFIG, encoding="utf-8-sig")).get("smtp", {})
+config = json.load(open(utils.ARQUIVO_CONFIG if os.path.exists(utils.ARQUIVO_CONFIG) else utils.LEGADO_CONFIG, encoding="utf-8-sig")).get("smtp", {})
 remetente = config.get("email")
 senha = (config.get("senha_app") or "").replace(" ", "")
 servidor, porta = config.get("servidor", "smtp.gmail.com"), config.get("porta", 587)

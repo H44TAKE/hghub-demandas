@@ -172,7 +172,7 @@ body {
 }
 
 body {
-  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: var(--font);
   font-size: 14px;
   line-height: 1.5;
   color: var(--text);
@@ -180,7 +180,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  font-feature-settings: "cv11", "ss01";
+  font-feature-settings: "kern", "calt";
   overflow: hidden;
 }
 
@@ -189,7 +189,7 @@ h2,
 h3,
 h4,
 h5 {
-  font-family: "Inter Tight", "Inter", system-ui, sans-serif;
+  font-family: var(--font-display);
   font-weight: 620;
   letter-spacing: -0.019em;
   line-height: 1.25;
@@ -1047,7 +1047,7 @@ input[type="date"] {
 
 .sidebar__name strong {
   display: block;
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-size: 14.5px;
   font-weight: 640;
   color: var(--nav-text);
@@ -2092,7 +2092,7 @@ input[type="date"] {
 
 .login__mark strong {
   display: block;
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-size: 18px;
   font-weight: 660;
   letter-spacing: -0.018em;
@@ -2132,7 +2132,7 @@ input[type="date"] {
 
 .login__stat strong {
   display: block;
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-size: 22px;
   font-weight: 640;
   color: var(--gold);
@@ -2280,7 +2280,7 @@ input[type="date"] {
 }
 
 .kpi__value {
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-size: 26px;
   font-weight: 620;
   letter-spacing: -0.03em;
@@ -3525,7 +3525,7 @@ input[type="date"] {
 }
 
 .mhero__title {
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-size: 19px;
   font-weight: 700;
   letter-spacing: -0.015em;
@@ -3628,7 +3628,7 @@ input[type="date"] {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-size: 19px;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -3890,7 +3890,7 @@ input[type="date"] {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-size: 14px;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -3954,7 +3954,7 @@ input[type="date"] {
 }
 
 .mfrente-card__valor {
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-size: 24px;
   font-weight: 800;
   line-height: 1.05;
@@ -4085,7 +4085,7 @@ input[type="date"] {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-size: 38px;
   font-weight: 800;
   line-height: 1;
@@ -4116,7 +4116,7 @@ input[type="date"] {
 
 .mdet-hero__titulo {
   margin: 6px 0 8px;
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-size: 28px;
   font-weight: 800;
   line-height: 1.1;
@@ -4168,7 +4168,7 @@ input[type="date"] {
 }
 
 .mdet-kpi__valor {
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-size: 28px;
   font-weight: 800;
   line-height: 1.05;
@@ -4365,7 +4365,7 @@ button.mdet-linha:hover {
 
 .mdet-linha__rank {
   width: 24px;
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-size: 13px;
   font-weight: 800;
   color: var(--text-3);
@@ -4395,7 +4395,7 @@ button.mdet-linha:hover {
 .mdet-linha__pct {
   width: 42px;
   text-align: right;
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-size: 13px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -4540,7 +4540,7 @@ button.mdet-linha:hover {
 .mhero-hall__rank {
   width: 24px;
   flex-shrink: 0;
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 13px;
   color: var(--text-3);
@@ -4901,7 +4901,7 @@ button.mdet-linha:hover {
 }
 
 .mprog-row__data-valor {
-  font-family: "Inter Tight", sans-serif;
+  font-family: var(--font-display);
   font-size: 16px;
   font-weight: 700;
   color: var(--text);
@@ -5293,3 +5293,150 @@ button.mdet-linha:hover {
 .sidebar__actions .sidebar__action--exit { order: 2; }
 .sidebar__actions #btn-atualizacoes { order: 3; flex: 1 1 100%; position: relative; }
 .sidebar__actions #btn-atualizacoes .sidebar__dot { position: absolute; right: 10px; top: 50%; margin: -4px 0 0; }
+
+
+/* ============================================================
+   99. REDESIGN 1.1 - identidade REDE HG (azul institucional + dourado como unico acento),
+   tipografia do Windows (Segoe UI Variable), superficies por borda e nao por sombra,
+   o que exige acao no topo do painel. Camada final: sobrescreve tokens e componentes acima.
+   ============================================================ */
+:root {
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+
+  --bg: #eff2f7;
+  --surface: #ffffff;
+  --surface-2: #f8f9fc;
+  --surface-3: #eef1f6;
+  --surface-hover: #f4f6fb;
+  --border: #dde3ec;
+  --border-soft: #e9edf4;
+  --border-strong: #c8d0de;
+
+  --text: #0c1424;
+  --text-2: #4c586d;
+  --text-3: #5b667b;
+
+  --brand: #14439c;
+  --brand-hover: #0d3b8c;
+  --brand-ink: #0d3b8c;
+  --brand-soft: #e8eefb;
+  --brand-soft-2: #d5e0f7;
+  --brand-border: #bccbee;
+
+  --nav-bg: #071634;
+  --nav-bg-2: #0a1d44;
+
+  --shadow-1: 0 1px 1px rgba(10, 24, 58, 0.04);
+  --shadow-2: 0 1px 2px rgba(10, 24, 58, 0.06), 0 6px 16px -8px rgba(10, 24, 58, 0.1);
+  --ring: 0 0 0 3px rgba(20, 67, 156, 0.22);
+
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 14px;
+}
+
+:root[data-theme="dark"] {
+  --bg: #070d1b;
+  --surface: #0d1630;
+  --surface-2: #111b38;
+  --surface-3: #16213f;
+  --surface-hover: #141f3b;
+  --border: #1f2c4b;
+  --border-soft: #19243f;
+  --border-strong: #2b3a5e;
+
+  --text: #e8edf8;
+  --text-2: #a2aec6;
+  --text-3: #8591ab;
+
+  --brand: #5f93ff;
+  --brand-hover: #82aaff;
+  --brand-ink: #a6c2ff;
+  --brand-soft: rgba(95, 147, 255, 0.14);
+  --brand-soft-2: rgba(95, 147, 255, 0.22);
+  --brand-border: rgba(95, 147, 255, 0.34);
+
+  --nav-bg: #050b1a;
+  --nav-bg-2: #08122a;
+  --ring: 0 0 0 3px rgba(95, 147, 255, 0.3);
+}
+
+/* tipografia: escala clara, numeros alinhados, titulos equilibrados */
+body { font-size: 14px; }
+h1, h2, h3, h4, h5 { text-wrap: balance; font-weight: 640; letter-spacing: -0.014em; }
+p, .muted-note { text-wrap: pretty; }
+table, .panel, .kanban, .task, .calendar, .kpis { font-variant-numeric: tabular-nums; }
+
+/* superficies que o navegador desenha: selecao, cursor, barras de rolagem, foco */
+::selection { background: var(--gold); color: #1a1300; }
+input, textarea, select { caret-color: var(--brand); accent-color: var(--brand); }
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); background-clip: content-box; border: 3px solid transparent; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-sm); }
+.sidebar :focus-visible { outline-color: var(--gold); }
+
+/* botoes e paineis: sem brilho, hierarquia por cor e borda */
+.btn { height: 36px; border-radius: var(--r-md); font-weight: 580; }
+.btn--primary { background: var(--brand); box-shadow: none; }
+.btn--primary:hover { background: var(--brand-hover); box-shadow: none; }
+.btn--secondary { box-shadow: none; }
+.panel, .card { box-shadow: none; border-color: var(--border); }
+
+/* navegacao: o dourado e so o marcador do item ativo */
+.nav-item.is-active { background: var(--nav-active); }
+.nav-item.is-active::before { background: var(--gold); width: 3px; border-radius: 0 3px 3px 0; }
+
+/* login: painel institucional liso (sem brilhos desfocados) */
+.login__brand { background: var(--nav-bg); }
+.login__brand::before, .login__brand::after { display: none; }
+.login__brand { border-right: 3px solid var(--gold); }
+
+/* ---------- dashboard: o que exige acao primeiro ---------- */
+.kpis--v2 { display: block; padding: 0; background: transparent; border: 0; box-shadow: none; overflow: visible; }
+.atencao { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.atencao__item {
+  display: grid; grid-template-columns: auto 1fr; grid-template-areas: "icone numero" "rotulo rotulo" "nota nota";
+  column-gap: 12px; align-items: center;
+  padding: 16px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.atencao__icone { grid-area: icone; font-size: 22px; display: flex; color: var(--text-3); }
+.atencao__numero { grid-area: numero; font-family: var(--font-display); font-size: 40px; font-weight: 650; letter-spacing: -0.035em; line-height: 1; font-variant-numeric: tabular-nums; }
+.atencao__rotulo { grid-area: rotulo; margin-top: 8px; font-size: 13.5px; font-weight: 620; color: var(--text); }
+.atencao__nota { grid-area: nota; font-size: 12px; color: var(--text-3); }
+.atencao__item--red { background: var(--red-soft); border-color: var(--red-border); }
+.atencao__item--red .atencao__icone, .atencao__item--red .atencao__numero { color: var(--red-ink); }
+.atencao__item--orange { background: var(--orange-soft); border-color: var(--orange-border); }
+.atencao__item--orange .atencao__icone, .atencao__item--orange .atencao__numero { color: var(--orange-ink); }
+.atencao__item--neutral .atencao__numero { color: var(--text); }
+.atencao__item--zero .atencao__numero { color: var(--text-3); font-weight: 560; }
+.atencao__item--zero .atencao__icone { color: var(--green); }
+.resumo { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0 0 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); }
+.resumo__item { padding: 12px 18px; border-right: 1px solid var(--border-soft); }
+.resumo__item:last-child { border-right: 0; }
+.resumo__item dt { font-size: 12px; font-weight: 540; color: var(--text-2); }
+.resumo__item dd { margin: 2px 0 0; font-family: var(--font-display); font-size: 22px; font-weight: 620; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
+.resumo__item dd small { font-size: 13px; color: var(--text-3); margin-left: 1px; }
+
+@media (max-width: 900px) {
+  .atencao { grid-template-columns: 1fr; }
+  .resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .resumo__item { border-bottom: 1px solid var(--border-soft); }
+}
+
+/* um unico momento de movimento: o painel se revela, escalonado, ao abrir */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes revelar { from { opacity: 0.001; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .atencao__item, .resumo { animation: revelar 360ms var(--ease-out) both; }
+  .atencao__item:nth-child(2) { animation-delay: 50ms; }
+  .atencao__item:nth-child(3) { animation-delay: 100ms; }
+  .resumo { animation-delay: 150ms; }
+}
+
+/* prioridade ja e dita pelo selo (Alta/Media/Baixa): a faixa colorida lateral fica fina, nao decorativa */
+.task, .kcard { border-left-width: 1px; }
+.day-task { border-left-width: 1px; }
+.toast-atualizacao { border-left: 1px solid var(--border); box-shadow: var(--shadow-2); }

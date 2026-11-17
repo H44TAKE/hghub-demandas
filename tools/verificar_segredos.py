@@ -16,7 +16,7 @@ PADROES = {
     "chave AWS": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     "senha fixa 123456 para o admin": re.compile(r"hash_senha\(\s*[\"']123456[\"']\s*\)"),
 }
-NOMES_PROIBIDOS = {"credenciais.json", "config.json", "usuarios.json", "dados_sistema_hg.json", "permissoes_contas.json",
+NOMES_PROIBIDOS = {"credenciais.json", "config.json", "usuarios.json", "dados_sistema_hg.json", "permissoes_contas.json", "configuracao.json", "preferencias_usuarios.json", "sessoes.json", "demandas.json", "catalogos.json",
                    "veiculos_ocultos.json", "sessao_hg.json"}
 # arquivos de teste podem conter senhas FALSAS de exemplo
 IGNORAR = ("tests/",)

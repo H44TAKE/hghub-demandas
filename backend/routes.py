@@ -22,6 +22,7 @@ checagem antes de aplicar a mudanca - ver `backend/models.py` para a regra.
 import base64
 import logging
 import os
+import secrets
 import threading
 import uuid
 from datetime import datetime, timedelta
@@ -29,6 +30,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, render_template, request, send_file, send_from_directory
 
 from . import manutencao
+from . import armazenamento
 from .models import Etiqueta, Pasta, Projeto, Tarefa, Usuario, sistema
 from .utils import (
     BASE_DIR,
@@ -37,6 +39,7 @@ from .utils import (
     enviar_email_recuperacao,
     extrair_token,
     gerar_codigo_recuperacao,
+    hash_token,
     hash_senha,
     ler_sessao_local,
     remover_sessao_local,
@@ -59,6 +62,18 @@ def _atualizar_estado():
     requisicao, inclusive leituras.
     """
     sistema.recarregar()
+
+
+@api.before_request
+def bloquear_se_base_indisponivel():
+    """Base ilegivel/ausente (rede fora do ar, JSON editado com erro...): nada e lido nem gravado, e o usuario
+    ve o motivo - em vez de um sistema "vazio" que parece ter perdido os dados."""
+    if request.method == "OPTIONS" or request.path.startswith("/api/atualizacao"):
+        return None
+    if sistema._base_ilegivel:
+        return erro(sistema._motivo_bloqueio or "A base de dados não pôde ser lida agora. Nada foi alterado.",
+                    503, tipo="base_indisponivel")
+    return None
 
 
 @api.before_request
@@ -173,9 +188,9 @@ def serve_logo():
 
 @arquivos.route("/fotos_usuarios/<path:filename>")
 def serve_foto_usuario(filename):
-    pasta = sistema.obter_pasta_fotos()
-    if os.path.exists(os.path.join(pasta, filename)):
-        return send_from_directory(pasta, filename)
+    pasta = sistema.pasta_de_foto(filename)
+    if pasta:
+        return send_from_directory(pasta, os.path.basename(filename))
     return serve_logo()
 
 
@@ -184,8 +199,9 @@ EXTENSOES_ANEXO_INLINE = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".tx
 
 @arquivos.route("/anexos_tarefas/<path:filename>")
 def serve_anexo(filename):
-    pasta = sistema.obter_pasta_anexos()
-    if os.path.exists(os.path.join(pasta, filename)):
+    pasta = sistema.pasta_de_anexo(filename)
+    if pasta:
+        filename = os.path.basename(filename)
         # So tipos sem script abrem na tela; .html/.svg e o resto sao BAIXADOS (um anexo .html aberto na
         # origem do app podia ler o token de sessao e agir como o usuario - XSS armazenado).
         seguro = os.path.splitext(filename)[1].lower() in EXTENSOES_ANEXO_INLINE
@@ -262,12 +278,22 @@ def api_cadastro():
     with sistema.transacao():
         if sistema.buscar_usuario_por_email(email):
             return erro("E-mail já cadastrado.")
-        sistema.registrar_setor(setor)
-        # Toda conta nova nasce comum, presa ao proprio setor. Só uma Conta
-        # Mestre já existente pode promover alguém depois (POST /usuario/<id>/gerenciar).
-        sistema.usuarios.append(Usuario(sistema.gerar_id(), nome, email, hash_senha(senha),
-                                         setores=[setor], conta_mestre=False))
+        # Toda conta nova nasce comum. Um setor que JA TEM demandas (pasta existente) nao pode ser autodeclarado
+        # por qualquer pessoa que se cadastre: a conta fica sem acesso e o pedido vai para a Conta Mestre liberar
+        # (tela Gerenciar usuarios). Um setor ainda sem pasta e criado e atribuido na hora.
+        existente = any((pasta.setor or pasta.nome) == setor for pasta in sistema.pastas)
+        liberar_agora = not existente
+        if liberar_agora:
+            sistema.registrar_setor(setor)
+        novo = Usuario(sistema.gerar_id(), nome, email, hash_senha(senha),
+                       setores=[setor] if liberar_agora else [], conta_mestre=False)
+        if not liberar_agora:
+            novo.extras["setor_solicitado"] = setor
+        sistema.usuarios.append(novo)
 
+    if not liberar_agora:
+        return jsonify({"success": True, "pendente": True,
+                        "message": f"Conta criada. O acesso ao setor {setor} precisa ser liberado por uma Conta Mestre."})
     return jsonify({"success": True, "message": "Conta criada com sucesso."})
 
 
@@ -292,7 +318,7 @@ def api_recuperacao_solicitar():
         if not usuario:
             return resposta
         codigo = gerar_codigo_recuperacao()
-        usuario.codigo_recuperacao = codigo
+        usuario.codigo_recuperacao = hash_token(codigo + usuario.id)   # so o hash fica no arquivo
         usuario.expiracao_codigo = (datetime.now() + timedelta(minutes=10)).isoformat()
 
     def enviar():
@@ -316,7 +342,7 @@ def _validar_codigo(usuario, codigo):
         usuario.codigo_recuperacao = None
         usuario.expiracao_codigo = None
         return erro("Código expirado. Solicite um novo.")
-    if usuario.codigo_recuperacao != codigo:
+    if not secrets.compare_digest(usuario.codigo_recuperacao, hash_token(str(codigo) + usuario.id)):
         return erro("Código incorreto.")
     return None
 
@@ -1327,3 +1353,32 @@ def api_manutencao_demandas_listar():
 from . import rotas_atualizacao  # noqa: E402
 
 rotas_atualizacao.registrar(api, erro)
+
+
+# ==============================================================
+# ARMAZENAMENTO (pasta de dados nova x arquivos antigos)
+# ==============================================================
+@api.get("/armazenamento")
+def api_armazenamento():
+    usuario = usuario_da_requisicao()
+    if not usuario or not usuario.conta_mestre:
+        return erro("Somente a Conta Mestre.", 403)
+    return jsonify({"success": True, **armazenamento.informacoes()})
+
+
+@api.post("/armazenamento/reimportar")
+def api_armazenamento_reimportar():
+    """Soma o que existe nos arquivos ANTIGOS e ainda nao esta na base nova (ex.: demandas criadas num PC que
+    ainda usava a versao antiga). Nunca remove nem sobrescreve nada. `aplicar=false` so mostra o que entraria."""
+    usuario = usuario_da_requisicao()
+    if not usuario or not usuario.conta_mestre:
+        return erro("Somente a Conta Mestre.", 403)
+    aplicar = bool(corpo().get("aplicar"))
+    try:
+        with sistema._lock:
+            relatorio = armazenamento.reimportar_legado(aplicar=aplicar)
+        if aplicar:
+            sistema.recarregar()
+    except armazenamento.ArmazenamentoError as falha:
+        return erro(str(falha), 409)
+    return jsonify({"success": True, "relatorio": relatorio})

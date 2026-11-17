@@ -71,3 +71,6 @@ skills-lock.json
 limpar_residuo_qa.py
 SENHA_INICIAL_ADMIN.txt
 notas.md
+
+# base de dados gerada pelo app (nunca versionar)
+HGhub-dados/
