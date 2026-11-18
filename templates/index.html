@@ -9,8 +9,9 @@
   // Aplica o tema antes da primeira pintura para não haver flash de tela clara.
   (function () {
     try {
+      // padrao CLARO (nunca "o que o Windows disser"); a escolha da pessoa e lembrada por conta e por PC
       var salvo = localStorage.getItem('hg_theme');
-      var escuro = salvo ? salvo === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var escuro = salvo === 'dark';
       document.documentElement.setAttribute('data-theme', escuro ? 'dark' : 'light');
     } catch (e) {
       document.documentElement.setAttribute('data-theme', 'light');
@@ -131,7 +132,11 @@
     <nav class="sidebar__nav" aria-label="Navegação principal">
       <p class="nav-label">Navegação</p>
 
-      <button class="nav-item is-active" data-action="nav" data-view="dashboard">
+      <button class="nav-item is-active" data-action="nav" data-view="meudia">
+        <i class="ph ph-sun-horizon"></i>
+        <span>Meu dia</span>
+      </button>
+      <button class="nav-item" data-action="nav" data-view="dashboard">
         <i class="ph ph-chart-pie-slice"></i>
         <span>Visão geral</span>
         <kbd class="nav-item__key">1</kbd>
@@ -158,12 +163,6 @@
           <span>Frota &amp; Manutenção</span>
         </button>
       </div>
-
-      <p class="nav-label" style="margin-top:12px">Relatórios</p>
-      <button class="nav-item" data-action="export">
-        <i class="ph ph-microsoft-excel-logo"></i>
-        <span>Exportar Excel</span>
-      </button>
 
       <div id="nav-admin-bloco" class="hidden">
         <p class="nav-label" style="margin-top:12px">Administração</p>
@@ -259,14 +258,16 @@
 
     <main class="content" id="content">
 
+      <!-- ---------- MEU DIA ---------- -->
+      <section id="view-meudia" class="view">
+        <div id="meudia-lista"></div>
+      </section>
+
       <!-- ---------- VISÃO GERAL ---------- -->
       <section id="view-dashboard" class="view">
         <div class="filters hidden" id="dash-filtro-setor" style="margin-bottom:16px">
           <i class="ph ph-buildings" style="color:var(--text-3);font-size:16px"></i>
           <select id="dash-setor" class="select select--auto"></select>
-          <button class="btn btn--secondary btn--sm" data-action="export-setor">
-            <i class="ph ph-microsoft-excel-logo"></i> Exportar este setor
-          </button>
         </div>
 
         <div class="kpis" id="kpis"></div>
@@ -342,6 +343,9 @@
       <section id="view-pastas" class="view hidden">
         <div class="view__bar">
           <p class="view__hint"><i class="ph ph-tree-structure"></i> Pastas contêm projetos, que contêm as tarefas.</p>
+          <button class="btn btn--secondary btn--sm" data-action="importar-demandas">
+            <i class="ph ph-file-arrow-up"></i> Importar planilha
+          </button>
           <button class="btn btn--primary btn--sm" data-action="new-folder">
             <i class="ph ph-plus"></i> Nova pasta
           </button>
@@ -350,7 +354,7 @@
         <div class="filters">
           <div class="input-icon filters__search">
             <i class="ph ph-magnifying-glass"></i>
-            <input type="search" id="filtro-busca" class="input" placeholder="Buscar por título, responsável, cidade...">
+            <input type="search" id="filtro-busca" class="input" placeholder="Buscar por título, descrição, responsável, cidade, projeto, etiqueta..." aria-label="Buscar demandas">
           </div>
           <select id="filtro-status" class="select select--auto">
             <option value="">Todos os status</option>
@@ -367,6 +371,21 @@
           </select>
           <select id="filtro-responsavel" class="select select--auto">
             <option value="">Todos os responsáveis</option>
+          </select>
+          <select id="filtro-prazo" class="select select--auto" aria-label="Filtrar por prazo">
+            <option value="">Qualquer prazo</option>
+            <option value="atrasadas">Atrasadas</option>
+            <option value="hoje">Vence hoje</option>
+            <option value="semana">Vence em 7 dias</option>
+            <option value="sem">Sem prazo</option>
+          </select>
+          <select id="filtro-etiqueta" class="select select--auto" aria-label="Filtrar por etiqueta">
+            <option value="">Todas as etiquetas</option>
+          </select>
+          <select id="filtro-concluidas" class="select select--auto" aria-label="Demandas concluídas">
+            <option value="ocultas">Ocultar concluídas</option>
+            <option value="recentes">Mostrar concluídas</option>
+            <option value="todas">Incluir arquivadas (+90 dias)</option>
           </select>
           <button class="icon-btn icon-btn--bordered" data-action="clear-filters" title="Limpar filtros" aria-label="Limpar filtros">
             <i class="ph ph-arrow-counter-clockwise"></i>
@@ -385,6 +404,16 @@
       <section id="view-quadro" class="view view--full hidden">
         <div class="view__bar">
           <p class="view__hint"><i class="ph ph-hand-grabbing"></i> Arraste os cartões entre as colunas para mudar o status.</p>
+          <div class="input-icon filters__search" style="max-width:280px">
+            <i class="ph ph-magnifying-glass"></i>
+            <input type="search" id="quadro-busca" class="input" placeholder="Buscar no quadro..." aria-label="Buscar no quadro">
+          </div>
+          <select id="quadro-concluidas" class="select select--auto" aria-label="Demandas concluídas">
+            <option value="ocultas">Ocultar concluídas</option>
+            <option value="recentes">Mostrar concluídas</option>
+            <option value="todas">Incluir arquivadas (+90 dias)</option>
+          </select>
+          <span id="quadro-aviso-concluidas" class="hidden"></span>
         </div>
         <div class="board" id="kanban-board"></div>
       </section>
@@ -1102,6 +1131,34 @@
       <div class="atualizacao" id="atualizacao-corpo" aria-live="polite"></div>
     </div>
     <div class="modal__foot" id="atualizacao-acoes"></div>
+  </div>
+</div>
+
+<!-- Importar planilha de exames -> demandas -->
+<div id="modal-importar-demandas" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-importar-demandas">
+  <div class="modal__card modal__card--wide">
+    <div class="modal__head">
+      <div class="modal__heading">
+        <div class="modal__mark"><i class="ph ph-file-arrow-up"></i></div>
+        <div>
+          <h3 class="modal__title" id="titulo-importar-demandas">Importar planilha</h3>
+          <p class="modal__sub">Lê a aba do mês e cria só as demandas que ainda não existem. O arquivo não é alterado.</p>
+        </div>
+      </div>
+      <button class="icon-btn" data-action="close-modal" data-modal="modal-importar-demandas" aria-label="Fechar"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal__body">
+      <div class="importar-arquivo">
+        <label class="btn btn--secondary btn--sm" for="importar-arquivo"><i class="ph ph-folder-open"></i> Escolher arquivo (.xlsx)</label>
+        <input type="file" id="importar-arquivo" accept=".xlsx" hidden>
+        <span class="muted-note" id="importar-nome-arquivo">Nenhum arquivo escolhido</span>
+      </div>
+      <div id="importar-corpo"></div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn btn--secondary" data-action="close-modal" data-modal="modal-importar-demandas">Cancelar</button>
+      <button class="btn btn--primary" id="importar-confirmar" data-action="importar-confirmar" disabled><i class="ph ph-check"></i> <span>Importar</span></button>
+    </div>
   </div>
 </div>
 

@@ -32,7 +32,6 @@ from .utils import (
     MENSAGEM_SEM_REDE,
     PASTA_ANEXOS,
     PASTA_FOTOS,
-    PASTA_LOCAL_APP,
     SEM_REDE_BLOQUEADO,
     bloqueio_arquivo,
     caminho_dado,
@@ -185,6 +184,7 @@ class Usuario:
             "setores": self.setores,
             "conta_mestre": self.conta_mestre,
             "setor_solicitado": self.extras.get("setor_solicitado") if not self.setores and not self.conta_mestre else None,
+            "tema": self.extras.get("tema"),
         }
 
     @staticmethod
@@ -949,36 +949,6 @@ class SistemaGestaoHG:
             "etiquetas_salvas": self.etiquetas_salvas,
         }
 
-    def exportar_dados_excel(self, usuario=None, setor=None):
-        import pandas as pd
-
-        pastas = self._pastas_do_relatorio(usuario, setor)
-        linhas = [{
-            "Setor": pasta.setor or "—",
-            "Pasta": pasta.nome,
-            "Projeto": projeto.nome,
-            "Tarefa": tarefa.titulo,
-            "Descrição": tarefa.descricao,
-            "Status": tarefa.status.nome,
-            "Prioridade": tarefa.prioridade,
-            "Responsável": tarefa.responsavel_nome,
-            "Cidade": tarefa.cidade or "",
-            "Previsão": tarefa.data_previsao.strftime("%d/%m/%Y") if tarefa.data_previsao else "",
-            "Vencimento": tarefa.data_vencimento.strftime("%d/%m/%Y") if tarefa.data_vencimento else "",
-            "Início real": tarefa.data_inicio_real.strftime("%d/%m/%Y") if tarefa.data_inicio_real else "",
-            "Fim real": tarefa.data_fim_real.strftime("%d/%m/%Y") if tarefa.data_fim_real else "",
-            "Conclusão": tarefa.data_conclusao.strftime("%d/%m/%Y") if tarefa.data_conclusao else "",
-            "Etiqueta": tarefa.etiqueta.nome,
-            "Concluída": "Sim" if tarefa.concluida else "Não",
-        } for pasta in pastas for projeto in pasta.projetos for tarefa in projeto.tarefas]
-
-        nome_arquivo = f"relatorio_demandas_{setor}.xlsx" if (usuario and usuario.conta_mestre and setor) \
-            else "relatorio_demandas.xlsx"
-        pasta_saida = os.path.join(PASTA_LOCAL_APP, "exportacoes")   # no PC de quem exporta, nao na pasta de dados
-        os.makedirs(pasta_saida, exist_ok=True)
-        caminho = os.path.join(pasta_saida, nome_arquivo)
-        pd.DataFrame(linhas).to_excel(caminho, index=False)
-        return caminho
 
 
 sistema = SistemaGestaoHG()

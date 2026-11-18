@@ -223,7 +223,7 @@ def main():
         confere(api("POST", "/api/cadastro", {"nome": "Ana E2E", "email": "ana.e2e@x.com", "senha": "abcd1234", "setor": "Frota"})[0] == 200, "conta de usuario criada")
         e = esperar_fase(token, ("disponivel", "pronta"), 60)
         confere(e and e["versao_nova"] == v_nova, f"o app percebe sozinho a versao {v_nova} (verificacao em segundo plano)")
-        antes = DADOS.read_bytes()      # a 1.0.0 grava no arquivo ANTIGO; a 1.1.0 vai importar e nunca mais grava nele
+        antes = (DADOS if DADOS.exists() else USUARIOS_JSON).read_bytes()   # 1.0.x grava no arquivo ANTIGO (a 1.1+ importa e nunca mais grava nele)
 
         print(f"[2] atualizar {v_antiga} -> {v_nova} pelo proprio app")
         st, _ = api("POST", "/api/atualizacao/baixar", token=token)
@@ -240,7 +240,7 @@ def main():
             x["nome"] == "E2E-Etiqueta" for x in api("GET", "/api/etiquetas", token=token)[1]["etiquetas"]), "etiqueta criada ANTES continua la")
         confere(api("POST", "/api/login", {"email": "ana.e2e@x.com", "senha": "abcd1234"})[0] == 200, "conta criada ANTES continua funcionando")
         confere(b"ana.e2e@x.com" in USUARIOS_JSON.read_bytes(), "base antiga IMPORTADA para a pasta nova (HGhub-dados)")
-        confere(DADOS.read_bytes() == antes, "arquivo antigo continua byte a byte igual (somente leitura)")
+        confere(not DADOS.exists() or DADOS.read_bytes() == antes, "arquivo antigo (se existir) continua byte a byte igual (somente leitura)")
         est = json.loads((LOCAL / "installers" / "estado.json").read_text(encoding="utf-8")) if (LOCAL / "installers" / "estado.json").exists() else {}
         confere(est.get("atual", {}).get("versao") == v_nova and est.get("anterior", {}).get("versao") == v_antiga,
                 f"instalador anterior ({v_antiga}) guardado para reversao")

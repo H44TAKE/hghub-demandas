@@ -1025,7 +1025,7 @@ function renderTabelaCadastro() {
   corpo.innerHTML = filtrados.slice(inicio, inicio + CADASTRO_POR_PAGINA).map((v) => `
     <tr class="${v.oculto ? 'is-oculto' : ''}">
       <td><span class="badge ${v.tipo === 'Carreta' ? 'badge--brand' : 'badge--neutral'}">${escapar(v.tipo || '—')}</span></td>
-      <td><strong>${escapar(v.placa)}</strong>${v.oculto ? ' <span class="badge badge--neutral">Oculto</span>' : ''}</td>
+      <td><strong>${escapar(v.placa)}</strong>${v.oculto ? ' <span class="badge badge--neutral">Oculto</span>' : ''}${v.origem === 'Revisões e óleo' ? ' <span class="badge badge--neutral" title="Esta placa só existe na planilha de Revisões e óleo; ainda não está na aba Frota">Só em Revisões</span>' : ''}</td>
       <td>${escapar(v.marca || '—')}</td>
       <td>${escapar(v.modelo || '—')}</td>
       <td>${v.ano_fab ?? '—'}${v.ano_mod && v.ano_mod !== v.ano_fab ? `/${v.ano_mod}` : ''}</td>

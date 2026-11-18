@@ -8,13 +8,14 @@ import {
   state, el, valor, definirValor, mostrar, nomeDoUsuario, marcarInvalido, limparInvalido,
 } from './state.js';
 import {
-  toast, abrirModal, fecharModal, aplicarPerfil, navegar,
+  toast, abrirModal, fecharModal, aplicarPerfil, navegar, aplicarTema,
   renderNotificacoes, carregando, atualizarDataAtual,
 } from './ui.js';
 
 /* ---------- Entrada e saída ---------- */
 async function entrarNaAplicacao(usuario) {
   state.usuario = usuario;
+  if (usuario.tema === 'light' || usuario.tema === 'dark') aplicarTema(usuario.tema);
   aplicarPerfil(usuario);
   atualizarDataAtual();
 
@@ -23,7 +24,7 @@ async function entrarNaAplicacao(usuario) {
 
   await carregarDados(state);
   renderNotificacoes();
-  navegar('dashboard');
+  navegar('meudia');
   iniciarAtualizacoes();   // aviso de nova versao, sem travar a tela
 }
 

@@ -399,6 +399,30 @@ def extrair_token(request):
 # ==============================================================
 # SESSAO LOCAL (arquivo no PC do usuario)
 # ==============================================================
+def caminho_preferencias_locais():
+    return os.path.join(os.path.dirname(caminho_sessao_local()), "preferencias_locais.json")
+
+
+def ler_preferencias_locais():
+    try:
+        with open(caminho_preferencias_locais(), "r", encoding="utf-8") as f:
+            dados = json.load(f)
+            return dados if isinstance(dados, dict) else {}
+    except Exception:
+        return {}
+
+
+def salvar_preferencia_local(chave, valor):
+    """Preferencias deste PC (ex.: tema), lembradas ate antes do login."""
+    try:
+        dados = ler_preferencias_locais()
+        dados[chave] = valor
+        with open(caminho_preferencias_locais(), "w", encoding="utf-8") as f:
+            json.dump(dados, f)
+    except Exception as erro:
+        log.warning("Nao foi possivel salvar a preferencia local: %s", erro)
+
+
 def salvar_sessao_local(token, usuario_id):
     try:
         with open(caminho_sessao_local(), "w", encoding="utf-8") as f:
@@ -456,20 +480,21 @@ def _template_email_recuperacao(codigo):
     """
 
 
-def enviar_email_recuperacao(destinatario, codigo):
-    """Envia o codigo de recuperacao por SMTP. Retorna (sucesso, mensagem)."""
+def enviar_email(destinatario, assunto, corpo_html):
+    """Envia um e-mail HTML por SMTP. Retorna (sucesso, mensagem)."""
+    remetente = None
     try:
         config = carregar_config().get("smtp", {})
         remetente = config.get("email")
         senha_app = (config.get("senha_app") or "").replace(" ", "")
         if not remetente or not senha_app:
-            return False, "Credenciais SMTP nao configuradas em config.json"
+            return False, "Credenciais SMTP nao configuradas em configuracao.json"
 
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Recuperacao de Senha - REDE HG"
+        msg["Subject"] = assunto
         msg["From"] = remetente
         msg["To"] = destinatario
-        msg.attach(MIMEText(_template_email_recuperacao(codigo), "html"))
+        msg.attach(MIMEText(corpo_html, "html"))
 
         with smtplib.SMTP(config.get("servidor", "smtp.gmail.com"), config.get("porta", 587), timeout=20) as server:
             server.starttls(context=ssl.create_default_context())   # valida o certificado do servidor
@@ -481,10 +506,15 @@ def enviar_email_recuperacao(destinatario, codigo):
         return False, (
             f"O servidor de e-mail recusou o login de {remetente} (erro {erro.smtp_code}: usuário ou senha de app "
             "não aceitos). A senha de app foi revogada ou trocada: gere uma nova senha de app para essa conta "
-            "e atualize 'smtp.senha_app' no config.json (pasta de dados, ao lado do dados_sistema_hg.json)."
+            "e atualize 'smtp.senha_app' no configuracao.json (pasta HGhub-dados)."
         )
     except Exception as erro:
         return False, f"Erro ao enviar e-mail: {erro}"
+
+
+def enviar_email_recuperacao(destinatario, codigo):
+    """Envia o codigo de recuperacao por SMTP. Retorna (sucesso, mensagem)."""
+    return enviar_email(destinatario, "Recuperacao de Senha - REDE HG", _template_email_recuperacao(codigo))
 
 
 def _autenticar_smtp(server, remetente, senha_app):

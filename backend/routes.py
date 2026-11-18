@@ -30,7 +30,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, render_template, request, send_file, send_from_directory
 
 from . import manutencao
-from . import armazenamento
+from . import armazenamento, importacao
 from .models import Etiqueta, Pasta, Projeto, Tarefa, Usuario, sistema
 from .utils import (
     BASE_DIR,
@@ -39,6 +39,8 @@ from .utils import (
     enviar_email_recuperacao,
     extrair_token,
     gerar_codigo_recuperacao,
+    ler_preferencias_locais,
+    salvar_preferencia_local,
     hash_token,
     hash_senha,
     ler_sessao_local,
@@ -100,6 +102,7 @@ def corpo():
 ROTAS_PUBLICAS = frozenset({
     "api_login", "api_cadastro", "api_sessao_validar", "api_sessao_encerrar", "api_sessao_arquivo",
     "api_recuperacao_solicitar", "api_recuperacao_validar", "api_recuperacao_redefinir", "api_setores",
+    "api_tema_local_obter", "api_tema_local_salvar",
 })
 limite_login = LimitadorTentativas(5, 15 * 60)
 limite_codigo = LimitadorTentativas(5, 15 * 60)
@@ -258,6 +261,39 @@ def api_sessao_arquivo():
             return jsonify({"success": True, "token": dados.get("token"), "usuario": usuario.para_json()})
         remover_sessao_local()
     return jsonify({"success": False, "message": "Nenhuma sessão salva."})
+
+
+TEMAS_VALIDOS = ("light", "dark")
+
+
+@api.get("/tema-local")
+def api_tema_local_obter():
+    """Tema lembrado NESTE PC (vale ate na tela de login)."""
+    return jsonify({"success": True, "tema": ler_preferencias_locais().get("tema")})
+
+
+@api.post("/tema-local")
+def api_tema_local_salvar():
+    tema = corpo().get("tema")
+    if tema not in TEMAS_VALIDOS:
+        return erro("Tema inválido.")
+    salvar_preferencia_local("tema", tema)
+    return jsonify({"success": True})
+
+
+@api.post("/preferencias/tema")
+def api_tema_conta():
+    """Tema escolhido pela CONTA: vale em qualquer PC em que ela entrar."""
+    tema = corpo().get("tema")
+    if tema not in TEMAS_VALIDOS:
+        return erro("Tema inválido.")
+    usuario = usuario_da_requisicao()
+    with sistema.transacao():
+        atual = sistema.buscar_usuario(usuario.id)
+        if atual:
+            atual.extras["tema"] = tema
+    salvar_preferencia_local("tema", tema)
+    return jsonify({"success": True})
 
 
 @api.post("/cadastro")
@@ -981,18 +1017,6 @@ def api_dashboard():
     return jsonify(sistema.metricas_dashboard(usuario, setor))
 
 
-@api.get("/exportar")
-def api_exportar():
-    usuario = usuario_da_requisicao()
-    setor = request.args.get("setor") or None
-    try:
-        caminho = sistema.exportar_dados_excel(usuario, setor)
-    except Exception as falha:
-        log.error("Erro ao exportar relatório: %s", falha)
-        return erro("Não foi possível gerar o relatório.", 500)
-    return send_file(caminho, as_attachment=True)
-
-
 # ==============================================================
 # MANUTENCAO PREVENTIVA (GOOGLE SHEETS)
 # ==============================================================
@@ -1382,3 +1406,139 @@ def api_armazenamento_reimportar():
     except armazenamento.ArmazenamentoError as falha:
         return erro(str(falha), 409)
     return jsonify({"success": True, "relatorio": relatorio})
+
+
+# ==============================================================
+# IMPORTAR PLANILHA DE EXAMES (aba do mes -> demandas, sem duplicar)
+# ==============================================================
+CORES_ETIQUETA_IMPORTADA = "#0D9488"
+
+
+def _cor_da_etiqueta(nome):
+    chave = importacao.normalizar(nome)
+    for etiqueta in sistema.etiquetas_salvas:
+        if importacao.normalizar(etiqueta.get("nome")) == chave and etiqueta.get("cor"):
+            return etiqueta["cor"]
+    for tarefa in sistema.todas_tarefas():
+        if importacao.normalizar(tarefa.etiqueta.nome) == chave and tarefa.etiqueta.cor:
+            return tarefa.etiqueta.cor
+    return CORES_ETIQUETA_IMPORTADA
+
+
+@api.post("/importar/planilha")
+def api_importar_planilha():
+    """Prévia (`confirmar=false`) ou importação (`confirmar=true`) de uma aba de vencimento de exames.
+    O arquivo so e LIDO. Nunca duplica: demanda que ja existe na pasta e pulada."""
+    dados = corpo()
+    requisitante = usuario_da_requisicao()
+    try:
+        binario = importacao.decodificar_arquivo(dados.get("arquivo"))
+        abas = importacao.listar_abas(binario)
+        aba = dados.get("aba") if dados.get("aba") in abas else importacao.aba_sugerida(abas)
+        linhas = importacao.ler_exames(binario, aba) if aba else []
+    except importacao.ImportacaoError as falha:
+        return erro(str(falha))
+
+    confirmar = bool(dados.get("confirmar"))
+    pasta = sistema.buscar_pasta(dados.get("pasta_id")) if dados.get("pasta_id") else None
+    if confirmar and not pasta:
+        return erro("Escolha a pasta de destino.")
+    if pasta is None and not confirmar:
+        pasta = importacao.pasta_sugerida(sistema.pastas)
+    if pasta and not sistema.usuario_pode_acessar_pasta(requisitante, pasta):
+        return erro("Você não tem acesso a esta pasta.", 403)
+
+    if confirmar:
+        return _importar_confirmar(dados, requisitante, aba, linhas)
+
+    regioes = []
+    estados = [("nova", None)] * len(linhas)
+    if pasta:
+        estados = importacao.classificar(pasta, linhas)
+        for regiao in sorted({l["regiao"] for l in linhas}):
+            projeto = importacao.projeto_sugerido(pasta, regiao)
+            regioes.append({
+                "regiao": regiao,
+                "projeto_id": projeto.id if projeto else None,
+                "projeto_nome": projeto.nome if projeto else importacao.projeto_padrao_da_regiao(regiao),
+                "criar": projeto is None,
+                "responsavel_id": importacao.responsavel_mais_comum(projeto),
+            })
+    novas = sum(1 for estado, _ in estados if estado == "nova")
+    return jsonify({
+        "success": True, "abas": abas, "aba": aba,
+        "pasta_id": pasta.id if pasta else None,
+        "regioes": regioes,
+        "resumo": {"lidas": len(linhas), "novas": novas, "existentes": len(linhas) - novas},
+        "linhas": [{
+            "nome": l["nome"], "exame": l["exame"], "regiao": l["regiao"],
+            "vencimento": l["vencimento"].strftime("%Y-%m-%d"), "situacao": l["situacao"],
+            "estado": estado, "motivo": motivo,
+        } for l, (estado, motivo) in zip(linhas, estados)],
+    })
+
+
+def _importar_confirmar(dados, requisitante, aba, linhas):
+    autor = requisitante.nome_display if requisitante else "Sistema"
+    escolhas = dados.get("projetos") or {}              # {REGIAO: projeto_id}; ausente/"" = cria o projeto padrao
+    escolha_resp = dados.get("responsavel_id", "auto")    # "auto" | "" (ninguem) | id
+    criadas, puladas, criados_projetos = [], [], []
+    notificar = {}
+
+    with sistema.transacao():
+        pasta = sistema.buscar_pasta(dados.get("pasta_id"))
+        if not pasta:
+            return erro("Pasta não encontrada.", 404)
+        projetos_da_regiao = {}
+        for regiao in sorted({l["regiao"] for l in linhas}):
+            projeto = None
+            if escolhas.get(regiao):
+                projeto = next((p for p in pasta.projetos if p.id == escolhas[regiao]), None)
+            projeto = projeto or importacao.projeto_sugerido(pasta, regiao)
+            projetos_da_regiao[regiao] = projeto
+
+        for linha in linhas:
+            # reclassifica a cada linha: tarefas recem-criadas nesta mesma importacao tambem contam
+            estado, motivo = importacao.classificar(pasta, [linha])[0]
+            if estado == "existente":
+                puladas.append({"nome": linha["nome"], "motivo": motivo})
+                continue
+            regiao = linha["regiao"]
+            projeto = projetos_da_regiao[regiao]
+            if projeto is None:
+                projeto = Projeto(sistema.gerar_id(), importacao.projeto_padrao_da_regiao(regiao))
+                pasta.projetos.append(projeto)
+                projetos_da_regiao[regiao] = projeto
+                criados_projetos.append(projeto.nome)
+            if escolha_resp == "auto":
+                responsavel = sistema.buscar_usuario(importacao.responsavel_mais_comum(projeto))
+            else:
+                responsavel = sistema.buscar_usuario(escolha_resp) if escolha_resp else None
+            status = sistema.buscar_status(importacao.status_da_linha(linha))
+            nova = Tarefa(
+                id=sistema.gerar_id(), titulo=importacao.titulo_da_demanda(linha["nome"]),
+                descricao=importacao.descricao_da_linha(linha, aba), status=status, responsavel=responsavel,
+                data_limite=linha["vencimento"], data_vencimento=linha["vencimento"],
+                data_previsao=linha["data_exame"],
+                etiqueta=Etiqueta(linha["exame"], _cor_da_etiqueta(linha["exame"])),
+                prioridade=importacao.prioridade_por_prazo(linha["vencimento"]),
+            )
+            if status.nome == "Concluída":
+                nova.concluida = True
+                nova.data_conclusao = linha["data_exame"] or linha["vencimento"]
+            nova.adicionar_historico(f"Importou da planilha (aba {aba})", autor)
+            projeto.tarefas.append(nova)
+            criadas.append({"id": nova.id, "titulo": nova.titulo, "projeto": projeto.nome})
+            if responsavel and status.nome != "Concluída":
+                notificar[responsavel.id] = notificar.get(responsavel.id, 0) + 1
+
+        for usuario_id, quantidade in notificar.items():
+            responsavel = sistema.buscar_usuario(usuario_id)
+            responsavel.notificacoes.insert(0, {
+                "id": sistema.gerar_id(), "tipo": "atribuicao",
+                "mensagem": f"{quantidade} demanda{'s' if quantidade > 1 else ''} de exames importada{'s' if quantidade > 1 else ''} para você (aba {aba}).",
+                "data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "lida": False,
+            })
+
+    return jsonify({"success": True, "criadas": len(criadas), "existentes": len(puladas),
+                    "projetos_criados": criados_projetos, "puladas": puladas[:50], "itens": criadas[:50]})

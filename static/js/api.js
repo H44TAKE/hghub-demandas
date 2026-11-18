@@ -81,6 +81,10 @@ export const api = {
   recuperacaoRedefinir: (dados) => requisicao('/api/recuperacao/redefinir', { metodo: 'POST', corpo: dados, silencioso: true }),
 
   /* Perfil */
+  importarPlanilha: (corpo) => requisicao('/api/importar/planilha', { metodo: 'POST', corpo, silencioso: true }),
+  temaConta: (tema) => requisicao('/api/preferencias/tema', { metodo: 'POST', corpo: { tema }, silencioso: true }),
+  temaLocal: (tema) => requisicao('/api/tema-local', { metodo: 'POST', corpo: { tema }, silencioso: true }),
+  temaLocalObter: () => requisicao('/api/tema-local', { silencioso: true }),
   atualizarPerfil: (dados) => requisicao('/api/perfil/atualizar', { metodo: 'POST', corpo: dados }),
   gerenciarUsuario: (usuarioId, dados) => requisicao(`/api/usuario/${usuarioId}/gerenciar`, { metodo: 'POST', corpo: dados }),
 
@@ -151,33 +155,4 @@ export async function carregarDados(state) {
     etiquetas_salvas: dados.etiquetas_salvas || [],
   };
   return state.dados;
-}
-
-/**
- * Baixa o relatório Excel ENVIANDO o token (antes: window.open sem token, e o servidor entregava
- * os dados de todos os setores a qualquer pessoa).
- */
-export async function baixarExportacao(setor = null) {
-  const url = '/api/exportar' + (setor ? `?setor=${encodeURIComponent(setor)}` : '');
-  const token = sessao.obter();
-  iniciarCarregamentoGlobal();
-  try {
-    const resposta = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-    if (!resposta.ok) {
-      let mensagem = 'Não foi possível gerar o relatório.';
-      try { mensagem = (await resposta.json()).message || mensagem; } catch (falha) { /* corpo não é JSON */ }
-      throw new Error(mensagem);
-    }
-    const blob = await resposta.blob();
-    const origem = (resposta.headers.get('Content-Disposition') || '').match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = origem ? decodeURIComponent(origem[1]) : 'relatorio_demandas.xlsx';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(link.href), 15000);
-  } finally {
-    concluirCarregamentoGlobal();
-  }
 }

@@ -54,7 +54,7 @@ def test_admin_inicial_nao_usa_a_senha_fixa_123456(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("metodo,rota", [
-    ("get", "/api/dados"), ("get", "/api/dashboard"), ("get", "/api/exportar"), ("get", "/api/cidades"),
+    ("get", "/api/dados"), ("get", "/api/dashboard"), ("get", "/api/cidades"),
     ("get", "/api/etiquetas"), ("post", "/api/setores/adicionar"), ("post", "/api/etiquetas"),
     ("post", "/api/cidades/adicionar"), ("post", "/api/anotacao"), ("post", "/api/perfil/atualizar"),
     ("get", "/api/usuario/x/notificacoes"), ("post", "/api/usuario/x/notificacoes/lidas"),
@@ -74,14 +74,10 @@ def test_rotas_publicas_continuam_abertas(ambiente):
     assert c.get("/").status_code == 200
 
 
-def test_exportar_com_token_respeita_o_setor(ambiente):
+def test_exportar_planilha_foi_removido(ambiente):
     _, c, _, _ = ambiente
     admin = login(c)
-    c.post("/api/pasta", json={"nome": "Pasta RH", "setor": "RH"}, headers=admin)
-    frota = criar_conta(c, "Ana", "ana@x.com", "Frota")
-    r = c.get("/api/exportar", headers=frota)
-    assert r.status_code == 200 and r.data[:2] == b"PK"            # xlsx de verdade
-    assert c.get("/api/exportar").status_code == 401
+    assert c.get("/api/exportar", headers=admin).status_code == 404
 
 
 def test_perfil_e_notificacoes_so_do_proprio_dono(ambiente):
@@ -207,4 +203,4 @@ def test_falha_de_gravacao_nao_responde_sucesso(ambiente, monkeypatch):
 def test_smtp_valida_certificado():
     import inspect
     from backend import utils
-    assert "create_default_context" in inspect.getsource(utils.enviar_email_recuperacao)
+    assert "create_default_context" in inspect.getsource(utils.enviar_email)

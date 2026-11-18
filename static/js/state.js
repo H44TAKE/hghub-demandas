@@ -7,7 +7,7 @@ export const state = {
   dados: { pastas: [], usuarios: [], status: [], cidades: [], anotacoes: {}, setores: [], etiquetas_salvas: [] },
   usuario: null,
   view: 'dashboard',
-  filtros: { busca: '', status: '', prioridade: '', responsavel: '' },
+  filtros: { busca: '', status: '', prioridade: '', responsavel: '', prazo: '', etiqueta: '', concluidas: 'ocultas' },
   recolhidos: { pastas: new Set(), projetos: new Set() },
   tarefaEmEdicao: null,
   mesCalendario: new Date(),
@@ -214,3 +214,8 @@ export const PALETA_PASTAS = [
   '#0D3B8C', '#2563EB', '#0EA5E9', '#059669', '#10B981',
   '#F5B800', '#F97316', '#DC2626', '#8B5CF6', '#64748B',
 ];
+
+/** Texto sem acento e em minusculas: a busca acha "Alvaro" digitando "alvaro", "ÁLVARO" ou "Álvaro". */
+export function normalizar(texto) {
+  return String(texto ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}

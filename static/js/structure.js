@@ -6,7 +6,7 @@
 import { api, carregarDados } from './api.js';
 import {
   state, el, qs, valor, definirValor, mostrar, escapar, cortar, plural,
-  avatarHTML, dataBR, paraData, venceEm, todasAsTarefas, buscarTarefa,
+  avatarHTML, dataBR, paraData, venceEm, diasAte, normalizar, todasAsTarefas, buscarTarefa,
   metaPrioridade, nomeDoUsuario, nomeDoAutor, PALETA_PASTAS, marcarInvalido, limparInvalido,
 } from './state.js';
 import {
@@ -26,13 +26,52 @@ export async function sincronizar() {
 /* ============================================================
    FILTROS
    ============================================================ */
+const CHAVE_FILTROS = 'hg_filtros';
+const DIAS_ARQUIVO = 90;           // concluidas ha mais que isso viram "arquivadas" (somem da lista, nada e apagado)
+const CONTROLES = {
+  busca: ['filtro-busca', 'quadro-busca'],
+  status: ['filtro-status'],
+  prioridade: ['filtro-prioridade'],
+  responsavel: ['filtro-responsavel'],
+  prazo: ['filtro-prazo'],
+  etiqueta: ['filtro-etiqueta'],
+  concluidas: ['filtro-concluidas', 'quadro-concluidas'],
+};
+let filtrosRestaurados = false;
+
+function gravarFiltros() {
+  try { localStorage.setItem(CHAVE_FILTROS, JSON.stringify(state.filtros)); } catch (e) { /* modo privado */ }
+}
+
+/** Mostra nos controles (da lista E do quadro) o que esta em `state.filtros`. */
+function sincronizarControles() {
+  Object.entries(CONTROLES).forEach(([chave, ids]) => ids.forEach((id) => {
+    const campo = el(id);
+    if (campo && campo.value !== (state.filtros[chave] ?? '')) campo.value = state.filtros[chave] ?? '';
+  }));
+}
+
+/** Os filtros escolhidos sao lembrados: ao reabrir o app a lista continua como a pessoa deixou. */
+export function restaurarFiltros() {
+  if (filtrosRestaurados) return;
+  filtrosRestaurados = true;
+  try {
+    const salvo = JSON.parse(localStorage.getItem(CHAVE_FILTROS) || 'null');
+    if (salvo && typeof salvo === 'object') state.filtros = { ...state.filtros, ...salvo };
+  } catch (e) { /* ignora */ }
+  if (!['ocultas', 'recentes', 'todas'].includes(state.filtros.concluidas)) state.filtros.concluidas = 'ocultas';
+  sincronizarControles();
+}
+
 export function lerFiltros() {
-  state.filtros = {
-    busca: valor('filtro-busca').toLowerCase(),
-    status: valor('filtro-status'),
-    prioridade: valor('filtro-prioridade'),
-    responsavel: valor('filtro-responsavel'),
-  };
+  const lido = {};
+  Object.entries(CONTROLES).forEach(([chave, ids]) => {
+    const campo = ids.map(el).find((c) => c && document.activeElement === c) || ids.map(el).find(Boolean);
+    lido[chave] = campo ? campo.value : state.filtros[chave];
+  });
+  state.filtros = { ...state.filtros, ...lido, concluidas: lido.concluidas || 'ocultas' };
+  sincronizarControles();
+  gravarFiltros();
 }
 
 export function aplicarFiltros() {
@@ -41,28 +80,70 @@ export function aplicarFiltros() {
 }
 
 export function limparFiltros() {
-  ['filtro-busca', 'filtro-status', 'filtro-prioridade', 'filtro-responsavel']
-    .forEach((id) => definirValor(id, ''));
-  aplicarFiltros();
+  state.filtros = { busca: '', status: '', prioridade: '', responsavel: '', prazo: '', etiqueta: '',
+    concluidas: state.filtros.concluidas };
+  sincronizarControles();
+  gravarFiltros();
+  renderEstrutura();
+}
+
+export function mostrarConcluidas() {
+  state.filtros.concluidas = 'recentes';
+  sincronizarControles();
+  gravarFiltros();
+  atualizarViewAtual();
 }
 
 function temFiltro() {
-  const { busca, status, prioridade, responsavel } = state.filtros;
-  return Boolean(busca || status || prioridade || responsavel);
+  const { busca, status, prioridade, responsavel, prazo, etiqueta } = state.filtros;
+  return Boolean(busca || status || prioridade || responsavel || prazo || etiqueta);
 }
 
-function passaNosFiltros(tarefa) {
-  const { busca, status, prioridade, responsavel } = state.filtros;
+function arquivada(tarefa) {
+  const dias = diasAte(tarefa.data_conclusao);
+  return tarefa.concluida && dias !== null && dias < -DIAS_ARQUIVO;
+}
 
+/** Uma demanda passa nos filtros? `ctx` leva os nomes do projeto/pasta (tambem entram na busca). */
+export function passaNosFiltros(tarefa, ctx = {}, filtros = state.filtros) {
+  const { busca, status, prioridade, responsavel, prazo, etiqueta } = filtros;
+  const concluidas = filtros.concluidas || 'ocultas';
+
+  if (tarefa.concluida) {
+    // pedir o status "Concluida" explicitamente mostra as concluidas mesmo com a lista "ocultando"
+    if (concluidas === 'ocultas' && status !== 'Concluída') return false;
+    if (concluidas !== 'todas' && arquivada(tarefa)) return false;
+  }
   if (busca) {
-    const alvo = [tarefa.titulo, tarefa.responsavel_nome, tarefa.cidade, tarefa.descricao, tarefa.etiqueta?.nome]
-      .filter(Boolean).join(' ').toLowerCase();
-    if (!alvo.includes(busca)) return false;
+    const alvo = normalizar([tarefa.titulo, tarefa.descricao, tarefa.responsavel_nome, tarefa.cidade, tarefa.etiqueta?.nome,
+      tarefa.status?.nome, tarefa.prioridade, ctx.projeto, ctx.pasta, tarefa.veiculo_placa].filter(Boolean).join(' '));
+    // todas as palavras digitadas precisam aparecer (em qualquer ordem)
+    if (!normalizar(busca).split(/\s+/).filter(Boolean).every((palavra) => alvo.includes(palavra))) return false;
   }
   if (status && tarefa.status?.nome !== status) return false;
   if (prioridade && tarefa.prioridade !== prioridade) return false;
   if (responsavel && tarefa.responsavel_id !== responsavel) return false;
+  if (etiqueta && tarefa.etiqueta?.nome !== etiqueta) return false;
+  if (prazo) {
+    const dias = diasAte(venceEm(tarefa));
+    const aberta = !tarefa.concluida && tarefa.status?.nome !== 'Cancelada';
+    if (prazo === 'atrasadas' && !(aberta && dias !== null && dias < 0)) return false;
+    if (prazo === 'hoje' && dias !== 0) return false;
+    if (prazo === 'semana' && !(dias !== null && dias >= 0 && dias <= 7)) return false;
+    if (prazo === 'sem' && dias !== null) return false;
+  }
   return true;
+}
+
+function preencherFiltroEtiquetas() {
+  const select = el('filtro-etiqueta');
+  if (!select) return;
+  const nomes = new Set((state.dados.etiquetas_salvas || []).map((e) => e.nome).filter(Boolean));
+  todasAsTarefas().forEach((t) => { if (t.etiqueta?.nome) nomes.add(t.etiqueta.nome); });
+  const atual = state.filtros.etiqueta;
+  select.innerHTML = '<option value="">Todas as etiquetas</option>'
+    + [...nomes].sort((x, y) => x.localeCompare(y, 'pt-BR')).map((n) => `<option value="${escapar(n)}">${escapar(n)}</option>`).join('');
+  select.value = atual;
 }
 
 function preencherFiltroResponsaveis() {
@@ -176,10 +257,15 @@ function htmlProjeto(projeto, tarefasVisiveis) {
   const pendentes = total - concluidas;
   const progresso = projeto.progresso || 0;
 
+  const ocultas = projeto.tarefas.filter((t) => t.concluida && !tarefasVisiveis.includes(t)).length;
+  const avisoOcultas = ocultas
+    ? `<button type="button" class="link-btn" data-action="mostrar-concluidas"><i class="ph ph-eye"></i> ${ocultas} ${plural(ocultas, 'concluída oculta', 'concluídas ocultas')} — mostrar</button>`
+    : '';
   const corpo = tarefasVisiveis.length
-    ? tarefasVisiveis.map(htmlTarefa).join('')
+    ? tarefasVisiveis.map(htmlTarefa).join('') + avisoOcultas
     : `<div class="empty empty--sm">
-         <p class="empty__text">${temFiltro() ? 'Nenhuma demanda corresponde aos filtros.' : 'Nenhuma demanda neste projeto ainda.'}</p>
+         <p class="empty__text">${temFiltro() ? 'Nenhuma demanda corresponde aos filtros.' : (ocultas ? 'Tudo concluído por aqui.' : 'Nenhuma demanda neste projeto ainda.')}</p>
+         ${avisoOcultas}
        </div>`;
 
   return `
@@ -301,7 +387,10 @@ export function renderEstrutura() {
   const container = el('lista-pastas');
   if (!container) return;
 
+  restaurarFiltros();
   preencherFiltroResponsaveis();
+  preencherFiltroEtiquetas();
+  sincronizarControles();
   renderFavoritos();
 
   if (!state.dados.pastas.length) {
@@ -321,7 +410,7 @@ export function renderEstrutura() {
   state.dados.pastas.forEach((pasta) => {
     const projetos = (pasta.projetos || []).map((projeto) => ({
       projeto,
-      tarefas: (projeto.tarefas || []).filter(passaNosFiltros),
+      tarefas: (projeto.tarefas || []).filter((t) => passaNosFiltros(t, { projeto: projeto.nome, pasta: pasta.nome })),
     })).filter((item) => !filtrando || item.tarefas.length > 0);
 
     if (filtrando && !projetos.length) return;

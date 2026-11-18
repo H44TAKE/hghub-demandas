@@ -7,9 +7,9 @@ import { state, el, qs, escapar } from './state.js';
 import {
   toast, hooks, abrirModal, fecharModal, fecharTopo, aplicarTema, alternarTema, temaAtual,
   alternarSidebar, restaurarSidebar, navegar, registrarView, renderNotificacoes,
-  alternarNotificacoes, fecharNotificacoes, atualizarDataAtual, modalAberto,
+  alternarNotificacoes, fecharNotificacoes, atualizarDataAtual, modalAberto, atualizarViewAtual,
 } from './ui.js';
-import { api, baixarExportacao } from './api.js';
+import { api } from './api.js';
 import {
   iniciarAtualizacoes, abrirAtualizacoes, verificarAtualizacao, baixarAtualizacao, aplicarAtualizacao,
   restaurarVersaoAnterior, lembrarMaisTarde, verNovidades,
@@ -19,7 +19,7 @@ import {
   solicitarCodigo, validarCodigo, redefinirSenha, abrirEdicaoDeNome, salvarNome, trocarAvatar,
 } from './auth.js';
 import {
-  renderEstrutura, aplicarFiltros, limparFiltros, alternarPasta, alternarProjeto, alternarFavorito,
+  renderEstrutura, aplicarFiltros, lerFiltros, mostrarConcluidas, limparFiltros, alternarPasta, alternarProjeto, alternarFavorito,
   abrirModalPasta, salvarPasta, excluirPasta, abrirModalProjeto, salvarProjeto, excluirProjeto,
   abrirNovaTarefa, abrirEdicaoTarefa, salvarTarefa, excluirTarefa, alternarStatusTarefa,
   trocarAba, alternarAvancado, alternarDependencia, enviarAnexo, adicionarComentario,
@@ -27,8 +27,10 @@ import {
   confirmarSugestaoAtivaVeiculoTarefa,
 } from './structure.js';
 import { renderKanban } from './kanban.js';
+import { renderMeuDia, concluirMinhaDemanda } from './meudia.js';
+import { abrirImportarDemandas, confirmarImportacao } from './importar.js';
 import { renderCalendario, mudarMes, irParaHoje, abrirDia } from './calendar.js';
-import { renderDashboard, mudarSetorDashboard, exportarSetorAtual } from './dashboard.js';
+import { renderDashboard, mudarSetorDashboard } from './dashboard.js';
 import {
   criarSetorInline, abrirGerenciarUsuarios, selecionarEtiquetaSalva, salvarEtiquetaAtual,
   carregarSetoresParaCadastro, alternarSetorUsuario,
@@ -52,6 +54,7 @@ import {
 registrarView('dashboard', renderDashboard);
 registrarView('pastas', renderEstrutura);
 registrarView('quadro', renderKanban);
+registrarView('meudia', renderMeuDia);
 registrarView('calendario', renderCalendario);
 registrarView('manutencao', renderManutencao);
 
@@ -95,12 +98,7 @@ const acoes = {
   'toggle-notifications': alternarNotificacoes,
   'close-modal': (alvo) => fecharModal(alvo.dataset.modal),
   'close-topmost': fecharTopo,
-  export: () => {
-    toast('Gerando relatório', 'O arquivo Excel será baixado em instantes.', 'info');
-    baixarExportacao().catch((falha) => toast('Não foi possível exportar', falha.message, 'error'));
-  },
   'open-admin-usuarios': abrirGerenciarUsuarios,
-  'export-setor': exportarSetorAtual,
   'admin-toggle-setor': (alvo) => alternarSetorUsuario(alvo.dataset.id, alvo.dataset.setor),
 
   /* Estrutura */
@@ -117,7 +115,11 @@ const acoes = {
   'toggle-project': (alvo) => alternarProjeto(alvo.dataset.id),
 
   'toggle-fav': (alvo) => alternarFavorito(alvo.dataset.item),
+  'meudia-concluir': (alvo) => concluirMinhaDemanda(alvo.dataset.id),
+  'importar-demandas': abrirImportarDemandas,
+  'importar-confirmar': confirmarImportacao,
   'clear-filters': limparFiltros,
+  'mostrar-concluidas': mostrarConcluidas,
 
   /* Demandas */
   'new-task': (alvo) => abrirNovaTarefa(alvo.dataset.projeto),
@@ -202,13 +204,19 @@ function debounce(fn, espera = 220) {
   };
 }
 
+/** Filtros mudaram: refaz a lista (ou o quadro, se for ele a tela aberta). */
+function aplicarFiltrosEAtualizar() {
+  lerFiltros();
+  atualizarViewAtual();
+}
+
 function ligarCampos() {
   el('form-login')?.addEventListener('submit', fazerLogin);
   el('form-cadastro')?.addEventListener('submit', fazerCadastro);
 
-  el('filtro-busca')?.addEventListener('input', debounce(aplicarFiltros));
-  ['filtro-status', 'filtro-prioridade', 'filtro-responsavel'].forEach((id) => {
-    el(id)?.addEventListener('change', aplicarFiltros);
+  ['filtro-busca', 'quadro-busca'].forEach((id) => el(id)?.addEventListener('input', debounce(aplicarFiltrosEAtualizar)));
+  ['filtro-status', 'filtro-prioridade', 'filtro-responsavel', 'filtro-prazo', 'filtro-etiqueta', 'filtro-concluidas', 'quadro-concluidas'].forEach((id) => {
+    el(id)?.addEventListener('change', aplicarFiltrosEAtualizar);
   });
 
   document.querySelectorAll('[data-action="change-avatar"]').forEach((campo) => {
@@ -333,7 +341,17 @@ hooks.aoAbrirNotificacoes = async () => {
 };
 
 async function iniciar() {
-  aplicarTema(temaAtual());
+  // O tema escolhido e lembrado: primeiro o deste PC (vale ate no login); depois do login vale o da conta.
+  try {
+    const local = await api.temaLocalObter();
+    aplicarTema(local.tema === 'dark' || local.tema === 'light' ? local.tema : temaAtual());
+  } catch (erro) {
+    aplicarTema(temaAtual());
+  }
+  document.addEventListener('tema:alterado', (evento) => {
+    if (!evento.detail.persistir) return;
+    (state.usuario ? api.temaConta(evento.detail.tema) : api.temaLocal(evento.detail.tema)).catch(() => {});
+  });
   restaurarSidebar();
   atualizarDataAtual();
   ligarCampos();

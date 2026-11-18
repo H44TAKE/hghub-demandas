@@ -1072,6 +1072,11 @@ def _serie(df, *alternativas):
     return pd.Series([None] * len(df), index=df.index)
 
 
+def _coluna_da_placa(df):
+    """"PLACA" se a aba tem essa coluna; senao a primeira (a aba de 5a roda esta com o cabecalho A1 em branco)."""
+    return "PLACA" if "PLACA" in {_normalizar_cabecalho(c) for c in df.columns} else 0
+
+
 def _placa_normalizada(valor):
     texto = _texto(valor)
     return texto.strip().upper() if texto else None
@@ -1305,7 +1310,7 @@ def listar_cadastro():
     """Cadastro de Frota: lista os dois universos (Cavalos + Carretas) juntos,
     1 dict por veículo com a `placa` embutida - alimenta a tabela da nova
     sub-aba "Cadastro de Frota". Devolve (lista, modificado_em)."""
-    arquivo_id, _ = _config_sheets()
+    arquivo_id, aba_oleo = _config_sheets()
     if not arquivo_id:
         raise PlanilhaNaoConfigurada(
             "ID do arquivo no Google Drive não configurado (config.json → "
@@ -1322,12 +1327,24 @@ def listar_cadastro():
     def construir():
         import pandas as pd
         xls = pd.ExcelFile(io.BytesIO(conteudo), engine="openpyxl")
-        cadastro = {**_ler_cadastro_frota(xls), **_ler_cadastro_carretas(xls)}
-        lista = [{"placa": placa, **dados} for placa, dados in cadastro.items()]
+        frota = _ler_cadastro_frota(xls)
+        carretas = _ler_cadastro_carretas(xls)
+        lista = [{"placa": p, "origem": "Frota", **d} for p, d in frota.items()]
+        lista += [{"placa": p, "origem": "info-carretas", **d} for p, d in carretas.items()]
+        # Placas que existem em "Revisões e óleo" e ainda não estão no cadastro: o cadastro mostra a UNIÃO
+        # (sem repetir placa); a origem diz de onde veio, para quem quiser completar o cadastro.
+        conhecidas = set(frota) | set(carretas)
+        for v in _veiculos_memoizados(conteudo, arquivo_id, modificado_em, aba_oleo):
+            placa = (v.get("placa") or "").strip().upper()
+            if placa and placa not in conhecidas and _placa_valida(placa):
+                conhecidas.add(placa)
+                lista.append({"placa": placa, "origem": "Revisões e óleo", "tipo": "Cavalo", "cod": v.get("cod"),
+                              "marca": v.get("marca"), "modelo": v.get("modelo"), "ano_fab": v.get("ano_fab"),
+                              "ano_mod": v.get("ano_mod"), "centro_custo": v.get("centro_custo")})
         lista.sort(key=lambda v: v["placa"])
         return lista
 
-    lista = _memoizado(("cadastro", arquivo_id), modificado_em, construir)
+    lista = _memoizado(("cadastro", arquivo_id, aba_oleo), modificado_em, construir)
     ocultos = carregar_ocultos()
     return [{**v, "oculto": v["placa"] in ocultos} for v in lista], modificado_em
 
@@ -1726,8 +1743,10 @@ def _construir_prontuario(conteudo, arquivo_id, aba_oleo, modificado_em):
         mapa_alinhamento = _ler_alinhamento(xls)
 
         aba_5r_carreta = pd.read_excel(xls, sheet_name=ABA_QUINTA_RODA_CARRETA, header=0)
+        # O cabecalho da coluna PLACA desta aba esta em branco (A1 vazio): sem esta saida a leitura nao achava
+        # nenhuma placa e a 5a roda ficava vazia. Sem a coluna "PLACA", vale a primeira coluna.
         mapa_5r_carreta = _mapa_por_placa(
-            aba_5r_carreta, "PLACA",
+            aba_5r_carreta, _coluna_da_placa(aba_5r_carreta),
             status="STATUS", ultima="DATA ÚLTIMA INSPEÇÃO", proxima="PRÓXIMA INSPEÇÃO",
             falta="TEMPO FALTA/EXCED.", estabelecimento="Estabelecimento", chamado="CHAMADO TKL",
             observacoes="Observações",

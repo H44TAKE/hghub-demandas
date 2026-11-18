@@ -46,6 +46,21 @@ e pode **somar** o que falta (`/api/armazenamento/reimportar`; nunca remove nem 
 Sem a pasta de rede o programa **não** abre uma base local vazia: mostra o motivo e não grava nada
 (para uso offline deliberado: `%LOCALAPPDATA%\HGhub\config_local.json` com `{"permitir_base_local": true}`).
 
+## Novidades da 1.2.0
+
+- **Meu dia** (tela inicial): só o que é seu e está atrasado ou vence em até 7 dias, com "Concluir" em um clique.
+- **Concluídas ocultas** na lista (Estrutura) e no Quadro, com aviso "N concluídas ocultas — mostrar". As concluídas há
+  mais de 90 dias viram *arquivadas* (nada é apagado; "Incluir arquivadas" as mostra).
+- **Busca e filtros melhores**: ignora acento e maiúsculas, vale para título, descrição, responsável, cidade, projeto,
+  pasta e etiqueta; filtros por prazo e etiqueta; os filtros escolhidos ficam lembrados.
+- **Importar planilha** (Estrutura): lê a aba do mês de uma planilha de vencimento de exames, mostra uma prévia e cria
+  só as demandas que ainda não existem (pasta/projeto à sua escolha). O arquivo nunca é alterado.
+- **E-mail semanal de vencimentos**: toda segunda, às 8h, cada responsável recebe um e-mail (atrasadas e vencimentos dos
+  próximos 7 dias). Desligar/ajustar em `configuracao.json`: `"avisos_semanais": {"ativo": false, "dia_semana": 0, "hora": 8}`.
+- **Tema** (claro/escuro) lembrado por conta e por PC; o padrão é claro.
+- Manutenção: 5ª roda voltou a aparecer, o Cadastro de Frota mostra a união Frota + Revisões e óleo, e a página não
+  "pula" mais ao ocultar um veículo. Removido o "Exportar Excel".
+
 ## Desenvolvimento
 
 ```powershell

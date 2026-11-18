@@ -143,6 +143,12 @@ if __name__ == "__main__":
         sys.exit(0)
     log.info("Iniciando Sistema de Demandas %s. Dados em: %s", versao.__version__, ARQUIVO_DADOS)
     iniciar_atualizador()
+    try:
+        from backend import avisos
+        from backend.models import sistema
+        avisos.iniciar_avisos_periodicos(sistema)
+    except Exception:
+        log.exception("Nao foi possivel iniciar os avisos diarios")
     print("=" * 60)
     print("  REDE HG - SISTEMA DE DEMANDAS")
     print(f"  Dados: {ARQUIVO_DADOS}")

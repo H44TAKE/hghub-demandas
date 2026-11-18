@@ -2,7 +2,7 @@
  * Visão geral: indicadores, gráficos do Chart.js e prazos em foco.
  */
 
-import { api, baixarExportacao } from './api.js';
+import { api } from './api.js';
 import {
   state, el, escapar, cortar, plural, dataBR, venceEm, diasAte, todasAsTarefas,
 } from './state.js';
@@ -283,16 +283,6 @@ function prepararFiltroSetor() {
 
 export function mudarSetorDashboard() {
   renderDashboard();
-}
-
-export function exportarSetorAtual() {
-  const setor = el('dash-setor')?.value;
-  if (!setor) {
-    toast('Selecione um setor', 'Escolha um setor na lista para exportar só ele — ou use "Exportar Excel" no menu para tudo.', 'warning');
-    return;
-  }
-  toast('Gerando relatório', `O Excel do setor "${setor}" será baixado em instantes.`, 'info');
-  baixarExportacao(setor).catch((falha) => toast('Não foi possível exportar', falha.message, 'error'));
 }
 
 /* ---------- Orquestração ---------- */

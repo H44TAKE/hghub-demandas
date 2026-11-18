@@ -6,7 +6,7 @@ import {
   state, el, escapar, cortar, avatarHTML, dataBR, venceEm,
   todasAsTarefas, metaPrioridade, metaStatus,
 } from './state.js';
-import { alternarStatusTarefa } from './structure.js';
+import { alternarStatusTarefa, passaNosFiltros, mostrarConcluidas, restaurarFiltros } from './structure.js';
 
 const COLUNAS_PADRAO = ['Pendente', 'Em Andamento', 'Concluída', 'Cancelada'];
 
@@ -86,17 +86,30 @@ function htmlCartao(tarefa, indice) {
     </article>`;
 }
 
+export { mostrarConcluidas };
+
 export function renderKanban() {
   const board = el('kanban-board');
   if (!board) return;
+  restaurarFiltros();
 
   const nomes = state.dados.status?.length
     ? state.dados.status.map((s) => s.nome)
     : COLUNAS_PADRAO;
 
-  const tarefas = todasAsTarefas();
+  // O quadro usa so a busca e o "concluidas": a coluna Concluida some quando as concluidas estao ocultas
+  const filtros = { busca: state.filtros.busca, concluidas: state.filtros.concluidas };
+  const todas = todasAsTarefas();
+  const tarefas = todas.filter((t) => passaNosFiltros(t, { projeto: t.projetoNome, pasta: t.pastaNome }, filtros));
+  const ocultas = todas.filter((t) => t.concluida).length - tarefas.filter((t) => t.concluida).length;
+  const aviso = el('quadro-aviso-concluidas');
+  if (aviso) {
+    aviso.classList.toggle('hidden', !ocultas);
+    aviso.innerHTML = ocultas
+      ? `<button type="button" class="link-btn" data-action="mostrar-concluidas"><i class="ph ph-eye"></i> ${ocultas} concluída${ocultas > 1 ? 's' : ''} oculta${ocultas > 1 ? 's' : ''} — mostrar</button>` : '';
+  }
 
-  board.innerHTML = nomes.map((nome) => {
+  board.innerHTML = nomes.filter((nome) => !(nome === 'Concluída' && filtros.concluidas === 'ocultas')).map((nome) => {
     const meta = metaStatus(nome);
     const daColuna = tarefas.filter((t) => t.status?.nome === nome);
 

@@ -277,7 +277,7 @@ export function confirmar({ titulo, texto, acao = 'Confirmar', perigo = false })
 }
 
 /* ---------- TEMA ---------- */
-export function aplicarTema(tema) {
+export function aplicarTema(tema, { persistir = false } = {}) {
   document.documentElement.setAttribute('data-theme', tema);
   try { localStorage.setItem('hg_theme', tema); } catch (e) { /* modo privado */ }
 
@@ -286,12 +286,12 @@ export function aplicarTema(tema) {
   if (icone) icone.className = tema === 'dark' ? 'ph ph-sun' : 'ph ph-moon';
   if (rotulo) rotulo.textContent = tema === 'dark' ? 'Claro' : 'Escuro';
 
-  document.dispatchEvent(new CustomEvent('tema:alterado', { detail: { tema } }));
+  document.dispatchEvent(new CustomEvent('tema:alterado', { detail: { tema, persistir } }));
 }
 
 export function alternarTema() {
   const atual = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-  aplicarTema(atual === 'dark' ? 'light' : 'dark');
+  aplicarTema(atual === 'dark' ? 'light' : 'dark', { persistir: true });
 }
 
 export function temaAtual() {
@@ -316,6 +316,7 @@ export function restaurarSidebar() {
 const views = new Map();
 
 const TITULOS = {
+  meudia: ['Meu dia', 'O que é seu e precisa de atenção.'],
   dashboard: ['Visão geral', 'Métricas e prazos da operação.'],
   pastas: ['Estrutura', 'Pastas, projetos e demandas da equipe.'],
   quadro: ['Quadro', 'Gestão visual do fluxo de trabalho.'],
