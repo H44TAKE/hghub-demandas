@@ -5445,6 +5445,10 @@ input, textarea, select { caret-color: var(--brand); accent-color: var(--brand);
 /* a pagina nao rola: so .content rola. `clip` proibe ate a rolagem programatica (foco/scrollIntoView de um
    elemento escondido empurrava o app inteiro para cima, deixando um espaco em branco) */
 html, body, .app, .main { overflow: clip; }
+/* `clip` (diferente de `hidden`) nao zera o tamanho minimo automatico dos itens flex/grid: sem isto a area de
+   conteudo crescia ate o tamanho do conteudo e a rolagem do mouse parava de funcionar */
+.app { grid-template-rows: minmax(0, 1fr); }
+.main, .content { min-height: 0; }
 .switch { position: relative; }
 .switch input { inset: 0; width: 100%; height: 100%; margin: 0; }
 

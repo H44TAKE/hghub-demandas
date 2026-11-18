@@ -77,5 +77,6 @@ def test_exportar_removido_e_switch_travado():
     import os
     css = open(os.path.join(os.path.dirname(__file__), "..", "static", "css", "style.css"), encoding="utf-8").read()
     assert "html, body, .app, .main { overflow: clip; }" in css and ".switch { position: relative; }" in css
+    assert ".main, .content { min-height: 0; }" in css          # sem isto o .content nao rola (bug da 1.2.0)
     html = open(os.path.join(os.path.dirname(__file__), "..", "templates", "index.html"), encoding="utf-8").read()
     assert "Exportar Excel" not in html and "export-setor" not in html
