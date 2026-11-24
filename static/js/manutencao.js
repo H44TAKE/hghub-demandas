@@ -22,7 +22,6 @@ const ROTULOS_ITEM = {
   oleo_motor: { titulo: 'Óleo do motor', icone: 'ph-drop' },
   oleo_cambio: { titulo: 'Óleo do câmbio', icone: 'ph-gear-six' },
   oleo_diferencial: { titulo: 'Óleo do diferencial', icone: 'ph-circle-dashed' },
-  aditivo: { titulo: 'Aditivo / ARLA', icone: 'ph-flask' },
 };
 
 let veiculos = [];
@@ -43,8 +42,6 @@ const LEGENDA_CAMPO = {
   km_atual: 'KM atual',
   'revisao.ultima_data': 'Última data de revisão',
   'revisao.ultima_km': 'Última km de revisão',
-  'aditivo.ultima_data': 'Última data de aditivo/ARLA',
-  'aditivo.ultima_km': 'Última km de aditivo/ARLA',
   'oleo_cambio.ultima_data': 'Última data de óleo do câmbio',
   'oleo_cambio.ultima_km': 'Última km de óleo do câmbio',
   'oleo_diferencial.ultima_data': 'Última data de óleo do diferencial',
@@ -151,9 +148,9 @@ function linhaItem(chave, item, kmAtual, cod = null) {
 
 /** O card desta aba resume o veículo pelo status da PRÓXIMA REVISÃO, e só
  * dela - de propósito, diferente do `status_geral` (que é o pior status
- * entre as 5 frentes: revisão, aditivo e os 3 óleos, e continua sendo usado
+ * entre as 5 frentes: revisão e os 3 óleos, e continua sendo usado
  * assim no Dashboard Geral/Health Score/Prontuário). Pedido do setor: óleo
- * ou aditivo vencidos não devem acender o aviso vermelho aqui - só a revisão
+ * vencido não devem acender o aviso vermelho aqui - só a revisão
  * em si. As outras 4 linhas expansíveis continuam com o badge individual de
  * cada uma (ver `linhaItem`), então aquele detalhe não se perde. */
 function statusProximaRevisao(v) {
@@ -189,7 +186,6 @@ function cardVeiculo(v) {
         ${linhaItem('oleo_motor', v.oleo_motor, v.km_atual, v.cod)}
         ${linhaItem('oleo_cambio', v.oleo_cambio, v.km_atual, v.cod)}
         ${linhaItem('oleo_diferencial', v.oleo_diferencial, v.km_atual, v.cod)}
-        ${linhaItem('aditivo', v.aditivo, v.km_atual, v.cod)}
         ${v.observacoes ? `<p class="field__hint"><i class="ph ph-note"></i> ${escapar(v.observacoes)}</p>` : ''}
         <button type="button" class="btn btn--secondary btn--block" data-action="abrir-prontuario" data-placa="${escapar(v.placa)}">
           <i class="ph ph-file-text"></i> Ver prontuário completo
@@ -1711,7 +1707,6 @@ function renderizarProntuario(dados, listaDemandas) {
         ${linhaItem('oleo_motor', v.oleo_motor, v.km_atual)}
         ${linhaItem('oleo_cambio', v.oleo_cambio, v.km_atual)}
         ${linhaItem('oleo_diferencial', v.oleo_diferencial, v.km_atual)}
-        ${linhaItem('aditivo', v.aditivo, v.km_atual)}
       </div>`);
   }
 

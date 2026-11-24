@@ -72,8 +72,6 @@ CAMPOS_EDITAVEIS = {
     "observacoes": (None, 2, 55, "texto"),
     "revisao.ultima_data": (None, 2, 7, "data"),
     "revisao.ultima_km": (None, 2, 8, "numero"),
-    "aditivo.ultima_data": (None, 2, 12, "data"),
-    "aditivo.ultima_km": (None, 2, 13, "numero"),
     "oleo_cambio.ultima_data": (None, 2, 17, "data"),
     "oleo_cambio.ultima_km": (None, 2, 18, "numero"),
     "oleo_diferencial.ultima_data": (None, 2, 21, "data"),
@@ -377,13 +375,11 @@ def _parse_linha_veiculo(linha):
     Mapeamento de colunas (1-based, igual ao número da coluna na planilha):
     1 COD · 2 Placa · 3 Marca · 4 Modelo · 5 Ano fab · 6 Ano mod
     7-10   última revisão (data, km, chamado, OC/OS)
-    12-15  última troca aditivo (data, km, tipo, OC/OS)
     17-19  última troca óleo câmbio (data, km, OC/OS)
     21-23  última troca óleo diferencial (data, km, OC/OS)
     25-27  última troca óleo motor (data, km, OC/OS)
     28 KM atual · 30 média KM/mês · 55 observações · 56 centro de custo
     31-34  próxima revisão (km, km falta, status, prog. troca)
-    35-38  próxima troca aditivo (km, km falta, status, prog. troca)
     39-42,44  próxima troca óleo câmbio (km, km falta, viscosidade, status, prog. troca)
     45-49  próxima troca óleo diferencial (km, km falta, viscosidade, status, prog.)
     50-54  próxima troca óleo motor (km, km falta, viscosidade, status, prog. troca)
@@ -398,7 +394,6 @@ def _parse_linha_veiculo(linha):
         return None
 
     revisao = _item_manutencao(linha, 7, 8, 31, 32, 33, prog_col=34)
-    aditivo = _item_manutencao(linha, 12, 13, 35, 36, 37, prog_col=38, tipo_col=14)
     oleo_cambio = _item_manutencao(linha, 17, 18, 39, 40, 42, prog_col=44, viscosidade_col=41)
     oleo_diferencial = _item_manutencao(linha, 21, 22, 45, 46, 48, prog_col=49, viscosidade_col=47)
     oleo_motor = _item_manutencao(linha, 25, 26, 50, 51, 53, prog_col=54, viscosidade_col=52)
@@ -415,12 +410,11 @@ def _parse_linha_veiculo(linha):
         "centro_custo": _texto(_celula(linha, 56)),
         "observacoes": _texto(_celula(linha, 55)),
         "revisao": revisao,
-        "aditivo": aditivo,
         "oleo_cambio": oleo_cambio,
         "oleo_diferencial": oleo_diferencial,
         "oleo_motor": oleo_motor,
         "status_geral": _status_geral(
-            revisao["status"], aditivo["status"], oleo_cambio["status"],
+            revisao["status"], oleo_cambio["status"],
             oleo_diferencial["status"], oleo_motor["status"],
         ),
     }
@@ -2021,7 +2015,7 @@ def _detalhe_frente(valor):
         falta = item.get("falta")
         proxima = item.get("proxima") if unidade == "dias" else None
     elif "revisao" in valor:
-        itens = [valor.get(chave) for chave in ("revisao", "aditivo", "oleo_cambio", "oleo_diferencial", "oleo_motor")]
+        itens = [valor.get(chave) for chave in ("revisao", "oleo_cambio", "oleo_diferencial", "oleo_motor")]
         itens = [i for i in itens if i and i.get("status")]
         if not itens:
             return None

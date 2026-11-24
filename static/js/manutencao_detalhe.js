@@ -566,7 +566,7 @@ function htmlHero(m) {
         <div class="mdet-anel__pct">${resumo.pct == null ? '—' : `${resumo.pct}%`}<small>em dia</small></div>
       </div>
       <div class="mdet-hero__texto">
-        <p class="mdet-hero__eyebrow"><i class="ph ${m.chave ? iconeFrente(m.chave) : 'ph-heartbeat'}"></i>${m.chave ? 'Análise da frente' : 'Análise geral da frota'}</p>
+        <p class="mdet-hero__eyebrow"><i class="ph ${m.chave ? iconeFrente(m.chave) : 'ph-wrench'}"></i>${m.chave ? 'Análise da frente' : 'Análise geral da frota'}</p>
         <h2 class="mdet-hero__titulo">${escapar(nome)}</h2>
         <p class="mdet-hero__frase">${escapar(frase)}</p>
         <span class="mdet-selo mdet-selo--${tom}">${SELO[tom]}</span>
