@@ -5475,3 +5475,4 @@ html, body, .app, .main { overflow: clip; }
 .meudia__meta { font-size: 12.5px; color: var(--text-2); }
 .meudia__acoes { display: flex; gap: 8px; flex-shrink: 0; }
 @media (max-width: 700px) { .meudia__item { flex-direction: column; align-items: stretch; } }
+.mfrente-card__rotulo { font-size: 14px; font-weight: 620; color: var(--text); }

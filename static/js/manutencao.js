@@ -280,7 +280,6 @@ function cardFrente(f) {
   const titulo = tituloFrente(f.chave);
   const tom = f.pct == null ? 'neutro' : corDoScore(f.pct);
   const vencidos = f.parar_urgente;
-  const rotuloVencidos = `${titulo} vencido${vencidos === 1 ? '' : 's'}`;
   const segmento = (qtd, classe) => (qtd
     ? `<span class="mfrente-card__seg mfrente-card__seg--${classe}" style="flex:${qtd} 1 0"></span>`
     : '');
@@ -298,17 +297,12 @@ function cardFrente(f) {
             </svg>
             <span class="mfrente-card__pct">${f.pct}%</span>
           </div>
-          <div class="mfrente-card__saude-texto">
-            <span class="mfrente-card__saude-rotulo">Saúde</span>
-            <span class="mfrente-card__saude-detalhe">${f.em_dia} de ${f.elegiveis} em dia</span>
-          </div>
         </div>
         <div class="mfrente-card__info">
           <div class="mfrente-card__corpo">
             <span class="mfrente-card__icone${vencidos ? '' : ' mfrente-card__icone--ok'}"><i class="ph ${iconeFrente(f.chave)}"></i></span>
             <div>
-              <p class="mfrente-card__valor">${vencidos}</p>
-              <p class="mfrente-card__rotulo">${escapar(rotuloVencidos)}</p>
+              <p class="mfrente-card__rotulo">${escapar(titulo)}</p>
             </div>
           </div>
           <div class="mfrente-card__barra" aria-hidden="true">

@@ -543,7 +543,7 @@ const SELO = { verde: 'Saudável', laranja: 'Em atenção', vermelho: 'Crítica'
 function htmlHero(m) {
   const { resumo } = m;
   const tom = tomDoScore(resumo.pct);
-  const nome = m.chave ? tituloFrente(m.chave) : 'Saúde da Frota';
+  const nome = m.chave ? tituloFrente(m.chave) : 'Manutenções da frota';
   const pctDe = (n) => (resumo.elegiveis ? `${Math.round((n / resumo.elegiveis) * 100)}% do total` : '');
   const tile = (rotulo, valor, sub, classe, icone) => `
     <div class="mdet-kpi mdet-kpi--${classe}">
@@ -884,7 +884,7 @@ export function mostrarMaisDetalhe() {
  * Página
  * ========================================================== */
 function atualizarTopo() {
-  const nome = escopo.tipo === 'frente' ? tituloFrente(escopo.chave) : 'Saúde da Frota';
+  const nome = escopo.tipo === 'frente' ? tituloFrente(escopo.chave) : 'Manutenções da frota';
   const atual = el('mdet-trilha-atual');
   if (atual) atual.textContent = nome;
   const ativo = contexto.obterFiltroTipo();
