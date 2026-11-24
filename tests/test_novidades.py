@@ -80,3 +80,14 @@ def test_exportar_removido_e_switch_travado():
     assert ".main, .content { min-height: 0; }" in css          # sem isto o .content nao rola (bug da 1.2.0)
     html = open(os.path.join(os.path.dirname(__file__), "..", "templates", "index.html"), encoding="utf-8").read()
     assert "Exportar Excel" not in html and "export-setor" not in html
+
+
+def test_aba_renomeada_na_planilha_ainda_e_encontrada():
+    from backend import manutencao as m
+
+    class Xls:
+        sheet_names = ["Revisões e óleo", "Preventiva Mensal Integridade C", "Integridade chassi 10.000KM",
+                       "Cópia de Preventiva Integridade", "Preventiva SR - TANQUES"]
+    assert m._nome_aba(Xls, "Preventiva Integridade Chassi") == "Preventiva Mensal Integridade C"
+    assert m._nome_aba(Xls, "Integridade chassi 10.000KM") == "Integridade chassi 10.000KM"
+    assert m._nome_aba(Xls, "Preventiva SR - TANQUES") == "Preventiva SR - TANQUES"

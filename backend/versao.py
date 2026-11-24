@@ -10,7 +10,7 @@ Versionamento semantico (MAJOR.MINOR.PATCH):
     MAJOR - mudancas incompativeis ou de grande impacto  (1.1.0 -> 2.0.0)
 """
 
-__version__ = "1.2.1"
+__version__ = "1.2.2"
 
 NOME_APP = "REDE HG - Sistema de Demandas"
 NOME_CURTO = "HGhub"

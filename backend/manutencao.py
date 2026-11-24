@@ -1051,6 +1051,38 @@ ABA_PREVENTIVA_CARRETAS_TEMPO = "Preventiva Semestral CARRETAS"
 ABA_RESUMO_ANALITICO = "RESUMO ANALITICO"
 
 
+def _nome_aba(xls, esperado):
+    """Nome real da aba. A planilha e editada a mao e abas ja foram renomeadas (ex.: "Preventiva Integridade
+    Chassi" virou "Preventiva Mensal Integridade C..."), o que derrubava TODO o Prontuario. Aceita o nome exato
+    e, se nao existir, a aba cujo nome combine (sem acento/caixa/espacos) com o inicio ou as palavras do esperado."""
+    import unicodedata
+
+    def chave(t):
+        t = unicodedata.normalize("NFD", str(t)).encode("ascii", "ignore").decode().lower()
+        return re.sub(r"[^a-z0-9]+", " ", t).strip()
+
+    if esperado in xls.sheet_names:
+        return esperado
+    alvo = chave(esperado)
+    abas = {n: chave(n) for n in xls.sheet_names if not chave(n).startswith("copia de")}
+    for n, c in abas.items():
+        if c == alvo or c.startswith(alvo) or alvo.startswith(c):
+            return n
+    palavras = [w for w in alvo.split() if w not in ("de", "e")]
+
+    def pontos(c):
+        partes = c.split()
+        acertos = sum(any(x == w or (len(x) >= 1 and w.startswith(x) and len(x) < len(w)) or x.startswith(w) for x in partes)
+                      for w in palavras)
+        # o nome comeca igual (mesma 1a palavra) vale mais: separa "Preventiva Mensal Integridade C" de "Integridade chassi 10.000KM"
+        return acertos * 10 + (5 if partes and palavras and partes[0] == palavras[0] else 0)
+
+    melhores = sorted(((pontos(c), n) for n, c in abas.items()), reverse=True)
+    if melhores and melhores[0][0] >= max(2, len(palavras) - 1) * 10 and (len(melhores) < 2 or melhores[0][0] > melhores[1][0]):
+        return melhores[0][1]
+    return esperado
+
+
 def _normalizar_cabecalho(nome):
     texto = str(nome).replace("\n", " ")
     return " ".join(texto.split()).strip().upper()
@@ -1214,7 +1246,7 @@ def _calcular_sr_tanques(mapa_sr_tempo, placa):
 def _ler_cadastro_frota(xls):
     import pandas as pd
 
-    df = pd.read_excel(xls, sheet_name=ABA_FROTA, header=0, usecols="A:G")
+    df = pd.read_excel(xls, sheet_name=_nome_aba(xls, ABA_FROTA), header=0, usecols="A:G")
     cadastro = {}
     for _, linha in df.iterrows():
         placa = _placa_normalizada(linha.iloc[1])
@@ -1235,7 +1267,7 @@ def _ler_cadastro_frota(xls):
 def _ler_cadastro_carretas(xls):
     import pandas as pd
 
-    df = pd.read_excel(xls, sheet_name=ABA_CADASTRO_CARRETAS, header=None)
+    df = pd.read_excel(xls, sheet_name=_nome_aba(xls, ABA_CADASTRO_CARRETAS), header=None)
     cadastro = {}
     for _, linha in df.iterrows():
         placa = _placa_normalizada(linha.iloc[0])
@@ -1574,7 +1606,7 @@ def _ler_alinhamento(xls):
     jeito diferente dependendo do próprio `Tipo`."""
     import pandas as pd
 
-    df = pd.read_excel(xls, sheet_name=ABA_ALINHAMENTO, header=0)
+    df = pd.read_excel(xls, sheet_name=_nome_aba(xls, ABA_ALINHAMENTO), header=0)
     tipo_serie = _serie(df, "Tipo")
     status_serie = _serie(df, "STATUS")
     km_atual_serie = _serie(df, "ÚLTIMO KM SISTEMA")
@@ -1637,7 +1669,7 @@ def _ler_logistica_resumo(xls):
     [[Módulo de Manutenção]]."""
     import pandas as pd
 
-    df = pd.read_excel(xls, sheet_name=ABA_RESUMO_ANALITICO, header=0)
+    df = pd.read_excel(xls, sheet_name=_nome_aba(xls, ABA_RESUMO_ANALITICO), header=0)
     placa_serie = _serie(df, "PLACA")
     no_patio_serie = _serie(df, "NO PATIO")
 
@@ -1742,7 +1774,7 @@ def _construir_prontuario(conteudo, arquivo_id, aba_oleo, modificado_em):
 
         mapa_alinhamento = _ler_alinhamento(xls)
 
-        aba_5r_carreta = pd.read_excel(xls, sheet_name=ABA_QUINTA_RODA_CARRETA, header=0)
+        aba_5r_carreta = pd.read_excel(xls, sheet_name=_nome_aba(xls, ABA_QUINTA_RODA_CARRETA), header=0)
         # O cabecalho da coluna PLACA desta aba esta em branco (A1 vazio): sem esta saida a leitura nao achava
         # nenhuma placa e a 5a roda ficava vazia. Sem a coluna "PLACA", vale a primeira coluna.
         mapa_5r_carreta = _mapa_por_placa(
@@ -1751,13 +1783,13 @@ def _construir_prontuario(conteudo, arquivo_id, aba_oleo, modificado_em):
             falta="TEMPO FALTA/EXCED.", estabelecimento="Estabelecimento", chamado="CHAMADO TKL",
             observacoes="Observações",
         )
-        aba_integridade_tempo = pd.read_excel(xls, sheet_name=ABA_INTEGRIDADE_TEMPO, header=0)
+        aba_integridade_tempo = pd.read_excel(xls, sheet_name=_nome_aba(xls, ABA_INTEGRIDADE_TEMPO), header=0)
         mapa_integridade_tempo = _mapa_por_placa(
             aba_integridade_tempo, "PLACA",
             status="Status", ultima="Data \nRevisão", proxima="Próxima revisão", falta="Razão",
             estabelecimento="Estabelecimento", chamado="Chamado TKL", observacoes="Observações",
         )
-        aba_integridade_km = pd.read_excel(xls, sheet_name=ABA_INTEGRIDADE_KM, header=0)
+        aba_integridade_km = pd.read_excel(xls, sheet_name=_nome_aba(xls, ABA_INTEGRIDADE_KM), header=0)
         mapa_integridade_km = _mapa_por_placa(
             aba_integridade_km, "PLACA",
             status="STATUS", km_atual="KM ATUAL", periodicidade="PERIODICIDADE",
@@ -1772,7 +1804,7 @@ def _construir_prontuario(conteudo, arquivo_id, aba_oleo, modificado_em):
         # nós, sempre. SR-Tanques também não tem aba de KM (categoria só por
         # tempo, sem barra de progresso - diferente de integridade de chassi,
         # a única categoria "dupla" que sobrou).
-        aba_sr_tempo = pd.read_excel(xls, sheet_name=ABA_SR_TANQUES_TEMPO, header=0)
+        aba_sr_tempo = pd.read_excel(xls, sheet_name=_nome_aba(xls, ABA_SR_TANQUES_TEMPO), header=0)
         mapa_sr_tempo = _mapa_por_placa(
             aba_sr_tempo, "PLACA",
             ultima="Data \nRevisão", estabelecimento="Estabelecimento", chamado="Chamado TKL",
@@ -1782,7 +1814,7 @@ def _construir_prontuario(conteudo, arquivo_id, aba_oleo, modificado_em):
         # o cabeçalho de verdade só começa na linha 1. Categoria só por TEMPO
         # (decisão de negócio: o controle por KM foi removido - ver
         # [[Módulo de Manutenção]]).
-        aba_prev_carretas_tempo = pd.read_excel(xls, sheet_name=ABA_PREVENTIVA_CARRETAS_TEMPO, header=1)
+        aba_prev_carretas_tempo = pd.read_excel(xls, sheet_name=_nome_aba(xls, ABA_PREVENTIVA_CARRETAS_TEMPO), header=1)
         mapa_prev_carretas_tempo = _mapa_por_placa(
             aba_prev_carretas_tempo, "PLACA",
             status="StatusPK", ultima="Data \nRevisão", proxima="Próxima revisão", falta="Razão",
