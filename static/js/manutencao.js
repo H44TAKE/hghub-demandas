@@ -752,7 +752,6 @@ const ABAS_CATEGORIA = {
   ],
   'sr-tanques': [{ chave: 'sr_tanques', container: 'manut-cat-sr_tanques' }],
 };
-const CATEGORIAS_DUPLAS = new Set(['integridade_chassi']);
 const abasCarregadas = new Set();
 
 /** SR-Tanques é uma categoria só-por-tempo, sem barra de progresso (regra dos
@@ -793,11 +792,8 @@ function cardCategoriaLinha(chave, linha) {
       </article>`;
   }
 
-  const ehDupla = CATEGORIAS_DUPLAS.has(chave);
-  const status = ehDupla ? item.status_geral : item.status;
-  const corpo = ehDupla
-    ? `${linhaCategoria('Por tempo', 'ph-calendar', item.tempo)}${linhaCategoria('Por quilometragem', 'ph-gauge', item.km)}`
-    : linhaCategoria(item.unidade === 'km' ? 'Por quilometragem' : 'Por tempo', item.unidade === 'km' ? 'ph-gauge' : 'ph-calendar', item);
+  const status = item.status;
+  const corpo = linhaCategoria(chave === 'alinhamento' ? 'Semestral (180 dias)' : 'Por tempo', 'ph-calendar', item);
 
   return `
     <article class="mcard">
@@ -827,13 +823,18 @@ function renderizarCategoriaNoContainer(chave, containerId, linhas) {
   }
 
   const ordem = { 'PARAR URGENTE': 0, 'PROGRAMAR PARADA': 1, 'EM DIA': 2 };
-  const ehDupla = CATEGORIAS_DUPLAS.has(chave);
-  const statusDe = (l) => (ehDupla ? l.item.status_geral : l.item.status);
-  container.innerHTML = linhas
-    .slice()
-    .sort((a, b) => (ordem[statusDe(a)] ?? 3) - (ordem[statusDe(b)] ?? 3))
-    .map((linha) => cardCategoriaLinha(chave, linha))
-    .join('');
+  const ordenar = (lista) => lista.slice().sort((x, y) => (ordem[x.item.status] ?? 3) - (ordem[y.item.status] ?? 3))
+    .map((linha) => cardCategoriaLinha(chave, linha)).join('');
+  if (chave === 'alinhamento') {
+    // Cavalos e Carretas separados (tudo semestral)
+    const grupo = (titulo, icone, lista) => (lista.length
+      ? `<h3 class="mgrupo-titulo"><i class="ph ${icone}"></i> ${titulo} <span class="badge badge--neutral num">${lista.length}</span></h3>${ordenar(lista)}` : '');
+    const carretas = linhas.filter((l) => (l.tipo || l.item.tipo) === 'Carreta');
+    const cavalos = linhas.filter((l) => (l.tipo || l.item.tipo) !== 'Carreta');
+    container.innerHTML = grupo('Cavalos', 'ph-truck', cavalos) + grupo('Carretas', 'ph-package', carretas);
+    return;
+  }
+  container.innerHTML = ordenar(linhas);
 }
 
 /** Busca TODAS as categorias de uma aba numa ÚNICA chamada (o backend monta o
@@ -1623,21 +1624,6 @@ function linhaCategoria(titulo, icone, item) {
     </div>`;
 }
 
-/** Seção de uma categoria "dupla" (tempo + km) - o status geral é o pior dos dois. */
-function secaoCategoriaDupla(chave, dupla) {
-  if (!dupla) return '';
-  const rotulo = ROTULOS_CATEGORIA[chave];
-  return `
-    <div class="prontuario__secao">
-      <div class="prontuario__secao-head">
-        <h4><i class="ph ${rotulo.icone}"></i>${rotulo.titulo}</h4>
-        <span class="badge ${badgeDoStatus(dupla.status_geral)}"><i class="ph ${iconeDoStatus(dupla.status_geral)}"></i>${rotuloStatus(dupla.status_geral)}</span>
-      </div>
-      ${linhaCategoria('Por tempo', 'ph-calendar', dupla.tempo)}
-      ${linhaCategoria('Por quilometragem', 'ph-gauge', dupla.km)}
-    </div>`;
-}
-
 /** Seção de uma categoria simples (um único item: km OU dias). */
 function secaoCategoriaSimples(chave, item) {
   if (!item) return '';
@@ -1712,7 +1698,7 @@ function renderizarProntuario(dados, listaDemandas) {
 
   secoes.push(secaoCategoriaSimples('alinhamento', cats.alinhamento));
   secoes.push(secaoCategoriaSimples('quinta_roda', cats.quinta_roda));
-  secoes.push(secaoCategoriaDupla('integridade_chassi', cats.integridade_chassi));
+  secoes.push(secaoCategoriaSimples('integridade_chassi', cats.integridade_chassi));
   secoes.push(secaoSrTanques(cats.sr_tanques));
   secoes.push(secaoCategoriaSimples('preventiva_carretas', cats.preventiva_carretas));
 

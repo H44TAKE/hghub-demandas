@@ -5476,3 +5476,6 @@ html, body, .app, .main { overflow: clip; }
 .meudia__acoes { display: flex; gap: 8px; flex-shrink: 0; }
 @media (max-width: 700px) { .meudia__item { flex-direction: column; align-items: stretch; } }
 .mfrente-card__rotulo { font-size: 14px; font-weight: 620; color: var(--text); }
+
+.mgrupo-titulo { display: flex; align-items: center; gap: 8px; margin: 18px 0 8px; font-size: 15px; }
+.mgrupo-titulo:first-child { margin-top: 0; }

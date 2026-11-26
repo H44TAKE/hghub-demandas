@@ -1039,7 +1039,6 @@ ABA_CADASTRO_CARRETAS = "info-carretas"
 ABA_ALINHAMENTO = "Alinhamento"
 ABA_QUINTA_RODA_CARRETA = "Inspeção 5ª roda e pino rei"
 ABA_INTEGRIDADE_TEMPO = "Preventiva Integridade Chassi"
-ABA_INTEGRIDADE_KM = "Integridade chassi 10.000KM"
 ABA_SR_TANQUES_TEMPO = "Preventiva SR - TANQUES"
 ABA_PREVENTIVA_CARRETAS_TEMPO = "Preventiva Semestral CARRETAS"
 ABA_RESUMO_ANALITICO = "RESUMO ANALITICO"
@@ -1145,35 +1144,6 @@ def _item_por_data(bruto):
         "estabelecimento": _texto(bruto.get("estabelecimento")),
         "chamado": _texto(bruto.get("chamado")),
         "observacoes": _texto(bruto.get("observacoes")),
-    }
-
-
-def _item_por_km(bruto):
-    """Formata um registro cru (km) no formato comum do Prontuário."""
-    return {
-        "unidade": "km",
-        "status": _texto(bruto.get("status")),
-        "km_atual": _numero(bruto.get("km_atual")),
-        "periodicidade": _numero(bruto.get("periodicidade")),
-        "proxima": _numero(bruto.get("proxima")),
-        "falta": _numero(bruto.get("falta")),
-        "chamado": _texto(bruto.get("chamado")),
-        "observacoes": _texto(bruto.get("observacoes")),
-    }
-
-
-def _categoria_dupla(mapa_tempo, mapa_km, placa):
-    """Uma categoria "dupla" (tempo + km) para uma placa: o pior status entre
-    as duas condições - a correção documentada no Dicionário de Dados para o
-    gap da aba RESUMO ANALITICO original, que só olhava a aba de tempo."""
-    tempo = _item_por_data(mapa_tempo[placa]) if placa in mapa_tempo else None
-    km = _item_por_km(mapa_km[placa]) if placa in mapa_km else None
-    if not tempo and not km:
-        return None
-    return {
-        "tempo": tempo,
-        "km": km,
-        "status_geral": _status_geral(tempo["status"] if tempo else None, km["status"] if km else None),
     }
 
 
@@ -1592,22 +1562,20 @@ def _data_valida(texto_iso):
     return texto_iso if int(texto_iso[:4]) >= 2000 else None
 
 
+ALINHAMENTO_DIAS_VALIDADE = 180     # semestral, para Cavalos E Carretas
+ALINHAMENTO_DIAS_ALERTA = 15
+
+
 def _ler_alinhamento(xls):
-    """A aba 'Alinhamento' mistura Cavalos (rastreados por KM, período
-    30.000km) e Carretas (rastreados por dias, período 180) na MESMA aba e nas
-    MESMAS colunas - só a coluna `Tipo` de cada linha diz qual regra vale.
-    Por isso não usa `_mapa_por_placa` genérico: cada linha é formatada de um
-    jeito diferente dependendo do próprio `Tipo`."""
+    """Alinhamento: Cavalos e Carretas, TODOS medidos por tempo, SEMESTRALMENTE (180 dias). Status/proxima/falta
+    sao calculados aqui a partir da data do ultimo alinhamento (nunca pelas formulas da planilha, que ja
+    quebraram com datas em branco). O tipo do veiculo vai junto para a tela separar Cavalos de Carretas."""
     import pandas as pd
 
     df = pd.read_excel(xls, sheet_name=_nome_aba(xls, ABA_ALINHAMENTO), header=0)
     tipo_serie = _serie(df, "Tipo")
-    status_serie = _serie(df, "STATUS")
-    km_atual_serie = _serie(df, "ÚLTIMO KM SISTEMA")
-    periodicidade_serie = _serie(df, "PERIODICIDADE")
-    proxima_serie = _serie(df, "PRÓXIMO ALINHAMENTO")
-    falta_serie = _serie(df, "KM/TEMPO\nFALTA/EXCED.")
     ultima_data_serie = _serie(df, "DATA ÚLTIMO ALINHAMENTO")
+    estab_serie = _serie(df, "Estabelecimento")
     chamado_serie = _serie(df, "CHAMADO")
     obs_serie = _serie(df, "Observações")
     placa_serie = _serie(df, "PLACA")
@@ -1615,36 +1583,27 @@ def _ler_alinhamento(xls):
     resultado = {}
     for posicao in range(len(df)):
         placa = _placa_normalizada(placa_serie.iloc[posicao])
-        if not placa:
+        if not placa or not _placa_valida(placa):
             continue
-        tipo = _texto(_valor_celula_pandas(tipo_serie.iloc[posicao]))
-        status = _texto(_valor_celula_pandas(status_serie.iloc[posicao]))
-        periodicidade = _numero(_valor_celula_pandas(periodicidade_serie.iloc[posicao]))
-        chamado = _texto(_valor_celula_pandas(chamado_serie.iloc[posicao]))
-        observacoes = _texto(_valor_celula_pandas(obs_serie.iloc[posicao]))
-
-        if tipo == "Carreta":
-            resultado[placa] = {
-                "unidade": "dias",
-                "status": status,
-                "ultima_data": _data_valida(_data(_valor_celula_pandas(ultima_data_serie.iloc[posicao]))),
-                "proxima": _data_valida(_data(_valor_celula_pandas(proxima_serie.iloc[posicao]))),
-                "falta": _numero(_valor_celula_pandas(falta_serie.iloc[posicao])),
-                "periodicidade": periodicidade,
-                "chamado": chamado,
-                "observacoes": observacoes,
-            }
-        else:
-            resultado[placa] = {
-                "unidade": "km",
-                "status": status,
-                "km_atual": _numero(_valor_celula_pandas(km_atual_serie.iloc[posicao])),
-                "periodicidade": periodicidade,
-                "proxima": _numero(_valor_celula_pandas(proxima_serie.iloc[posicao])),
-                "falta": _numero(_valor_celula_pandas(falta_serie.iloc[posicao])),
-                "chamado": chamado,
-                "observacoes": observacoes,
-            }
+        ultima_txt = _data_valida(_data(_valor_celula_pandas(ultima_data_serie.iloc[posicao])))
+        item = {
+            "unidade": "dias",
+            "tipo": _texto(_valor_celula_pandas(tipo_serie.iloc[posicao])),
+            "status": None, "ultima_data": ultima_txt, "proxima": None, "falta": None,
+            "periodicidade": ALINHAMENTO_DIAS_VALIDADE,
+            "estabelecimento": _texto(_valor_celula_pandas(estab_serie.iloc[posicao])),
+            "chamado": _texto(_valor_celula_pandas(chamado_serie.iloc[posicao])),
+            "observacoes": _texto(_valor_celula_pandas(obs_serie.iloc[posicao])),
+        }
+        if ultima_txt:
+            ultima = datetime.strptime(ultima_txt, "%Y-%m-%d").date()
+            proxima = ultima + timedelta(days=ALINHAMENTO_DIAS_VALIDADE)
+            falta = (proxima - date.today()).days
+            item["proxima"] = proxima.strftime("%Y-%m-%d")
+            item["falta"] = falta
+            item["status"] = ("PARAR URGENTE" if falta < 0
+                              else "PROGRAMAR PARADA" if falta <= ALINHAMENTO_DIAS_ALERTA else "EM DIA")
+        resultado[placa] = item
     return resultado
 
 
@@ -1653,9 +1612,8 @@ def _ler_logistica_resumo(xls):
     outra aba: "NO PATIO" é valor manual/direto (não fórmula) nessa aba. As
     outras colunas informativas dessa mesma aba (REVISAO, 5ª RODA,
     INTEGRIDADE, SR - TANQUES) são só um `VLOOKUP` contra abas que este
-    módulo já lê e já cruza melhor (pior status entre tempo E km, não só
-    tempo como a fórmula original) - o Resumo Analítico do app usa esse
-    valor corrigido (`_categoria_dupla`) em vez de reler a fórmula antiga.
+    módulo já lê e já cruza melhor (status por tempo) - o Resumo Analítico do app usa esse
+    valor corrigido em vez de reler a fórmula antiga.
 
     "IPIRANGA" foi removida por pedido explícito - a coluna não tinha
     contrapartida de status (era só texto livre, sem regra de vencimento) e
@@ -1783,14 +1741,6 @@ def _construir_prontuario(conteudo, arquivo_id, aba_oleo, modificado_em):
             status="Status", ultima="Data \nRevisão", proxima="Próxima revisão", falta="Razão",
             estabelecimento="Estabelecimento", chamado="Chamado TKL", observacoes="Observações",
         )
-        aba_integridade_km = pd.read_excel(xls, sheet_name=_nome_aba(xls, ABA_INTEGRIDADE_KM), header=0)
-        mapa_integridade_km = _mapa_por_placa(
-            aba_integridade_km, "PLACA",
-            status="STATUS", km_atual="KM ATUAL", periodicidade="PERIODICIDADE",
-            proxima="PRÓXIMA INSPEÇÃO", falta="TEMPO FALTA/EXCED.", chamado="CHAMADO TKL",
-            observacoes="Observações",
-        )
-
         # Só a data bruta da última revisão (+ texto livre) - "Status",
         # "Próxima revisão" e "Razão" são fórmulas do Excel que enlouquecem
         # quando a célula de origem está vazia (ver `_calcular_sr_tanques`),
@@ -1822,7 +1772,7 @@ def _construir_prontuario(conteudo, arquivo_id, aba_oleo, modificado_em):
         raise PlanilhaNaoConfigurada(f"Não foi possível ler as abas do Prontuário: {falha}") from falha
 
     todas_as_placas = set(cadastro) | set(veiculos_oleo) | set(mapa_alinhamento) \
-        | set(mapa_5r_carreta) | set(mapa_integridade_tempo) | set(mapa_integridade_km) \
+        | set(mapa_5r_carreta) | set(mapa_integridade_tempo) \
         | set(mapa_sr_tempo) | set(mapa_prev_carretas_tempo) \
         | set(mapa_logistica)
 
@@ -1842,9 +1792,8 @@ def _construir_prontuario(conteudo, arquivo_id, aba_oleo, modificado_em):
         if placa in mapa_5r_carreta:
             categorias["quinta_roda"] = _item_por_data(mapa_5r_carreta[placa])
 
-        integridade = _categoria_dupla(mapa_integridade_tempo, mapa_integridade_km, placa)
-        if integridade:
-            categorias["integridade_chassi"] = integridade
+        if placa in mapa_integridade_tempo:       # SO por tempo (o controle por quilometragem foi removido)
+            categorias["integridade_chassi"] = _item_por_data(mapa_integridade_tempo[placa])
 
         sr_tanques = _calcular_sr_tanques(mapa_sr_tempo, placa)
         if sr_tanques:
@@ -1911,7 +1860,7 @@ def resumo_analitico_matriz():
             "modelo": cadastro.get("modelo"),
             "revisao": preventiva.get("status") if preventiva else None,
             "quinta_roda": quinta_roda.get("status") if quinta_roda else None,
-            "integridade": integridade.get("status_geral") if integridade else None,
+            "integridade": integridade.get("status") if integridade else None,
             "sr_tanques": sr_tanques.get("status") if sr_tanques else None,
             "no_patio": bool(logistica.get("no_patio")) if logistica else False,
             "status_geral": registro.get("status_geral"),
